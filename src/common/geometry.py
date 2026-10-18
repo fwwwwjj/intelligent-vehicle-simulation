@@ -113,6 +113,48 @@ class CollisionChecker:
         return True  # 所有分离轴上投影均重叠，判定为碰撞
 
     @staticmethod
+    def _point_segment_distance(
+        point: np.ndarray,
+        seg_start: np.ndarray,
+        seg_end: np.ndarray,
+    ) -> float:
+        """点到线段的最短欧氏距离。"""
+        seg = seg_end - seg_start
+        seg_len_sq = float(seg @ seg)
+        if seg_len_sq < 1e-12:
+            return float(np.linalg.norm(point - seg_start))
+        ratio = float(np.clip((point - seg_start) @ seg / seg_len_sq, 0.0, 1.0))
+        projection = seg_start + ratio * seg
+        return float(np.linalg.norm(point - projection))
+
+    @staticmethod
+    def min_distance_between_boxes(box1: BoundingBox2D, box2: BoundingBox2D) -> float:
+        """
+        计算两个 OBB 包围盒之间的最短净距离 (m)。
+        相交时返回 0.0；否则返回两条矩形边界之间的最小距离。
+        """
+        if CollisionChecker.check_obb_collision(box1, box2, buffer=0.0):
+            return 0.0
+
+        corners1 = np.array(box1.get_corners(), dtype=np.float64)
+        corners2 = np.array(box2.get_corners(), dtype=np.float64)
+        best = float("inf")
+        for i in range(4):
+            a0 = corners1[i]
+            a1 = corners1[(i + 1) % 4]
+            for j in range(4):
+                b0 = corners2[j]
+                b1 = corners2[(j + 1) % 4]
+                best = min(
+                    best,
+                    CollisionChecker._point_segment_distance(a0, b0, b1),
+                    CollisionChecker._point_segment_distance(a1, b0, b1),
+                    CollisionChecker._point_segment_distance(b0, a0, a1),
+                    CollisionChecker._point_segment_distance(b1, a0, a1),
+                )
+        return float(best)
+
+    @staticmethod
     def calculate_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
         """计算两点欧氏距离"""
         return float(np.hypot(p1[0] - p2[0], p1[1] - p2[1]))

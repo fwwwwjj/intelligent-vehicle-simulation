@@ -1,7 +1,8 @@
 """
-真实道路轨迹数据集与场景描述文件加载器接口。
-支持 NGSIM、highD、INTERACTION 公开数据集及 OpenSCENARIO 格式的抽象规范。
-满足中国仿真创新应用大赛中对“真实数据驱动”与“数据来源可溯性”的要求。
+真实道路轨迹数据集与场景描述文件加载器的**接口骨架**。
+定义 NGSIM、highD、INTERACTION 及 OpenSCENARIO 的抽象规范；
+当前仓库未附带原始数据，loader 只返回元数据/空列表，不能据此声称已完成
+“真实数据驱动标定”。
 """
 
 from abc import ABC, abstractmethod
@@ -31,8 +32,11 @@ class BaseDatasetLoader(ABC):
 
 class HighDDatasetLoader(BaseDatasetLoader):
     """
-    德国高速公路 highD 数据集解析器接口。
-    数据来源：基于无人机俯拍的高精度自然驾驶轨迹数据集，包含高密度的超车与汇聚行为。
+    德国高速公路 highD 数据集解析器**接口骨架**。
+
+    当前仓库未附带 highD 原始数据，``load_scenario`` 只返回元数据，
+    ``get_frame_obstacles`` 返回空列表。接入真实数据前，不得在文档中声称
+    “已用 highD 标定 IDM”。
     """
     def __init__(self, data_root: str = "data/raw/highD"):
         self.data_root = data_root
@@ -54,8 +58,7 @@ class HighDDatasetLoader(BaseDatasetLoader):
 
 class InteractionDatasetLoader(BaseDatasetLoader):
     """
-    加州大学伯克利分校 INTERACTION 数据集解析器接口。
-    数据来源：针对环岛、无保护路口、高速合流等强博弈场景的国际标准评测集。
+    INTERACTION 数据集解析器**接口骨架**（未读取实际数据文件）。
     """
     def __init__(self, data_root: str = "data/raw/INTERACTION"):
         self.data_root = data_root
@@ -77,9 +80,9 @@ class OpenScenarioParser:
     """
     @staticmethod
     def parse_xosc(file_path: str) -> Dict[str, Any]:
-        """解析 XML 场景逻辑文件"""
+        """解析 XML 场景逻辑文件（当前仅占位，未实现 XML 解析）。"""
         return {
             "format": "OpenSCENARIO",
             "path": file_path,
-            "status": "ready"
+            "status": "interface_only",
         }

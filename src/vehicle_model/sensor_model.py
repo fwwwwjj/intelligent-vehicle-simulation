@@ -1,10 +1,13 @@
 """
 车载感知传感器数字建模 (Sensor Digital Model)。
 包含激光雷达 (LiDAR) 与前视相机 (Camera) 的有效视场角 (FOV)、最大感知测距及高斯测量噪声建模。
+
+随机数生成器可由外部注入，保证同一 seed 下仿真结果可复现。
 """
 
-from typing import List
+from typing import List, Optional
 import numpy as np
+
 from src.common.state import VehicleState, ObstacleState
 
 
@@ -17,12 +20,14 @@ class SensorModel:
         max_range: float = 80.0,
         fov_deg: float = 360.0,
         pos_noise_std: float = 0.05,
-        vel_noise_std: float = 0.10
+        vel_noise_std: float = 0.10,
+        rng: Optional[np.random.Generator] = None,
     ):
         self.max_range = max_range
         self.fov_rad = np.radians(fov_deg)
         self.pos_noise_std = pos_noise_std
         self.vel_noise_std = vel_noise_std
+        self.rng = rng if rng is not None else np.random.default_rng()
 
     def filter_perceived_obstacles(
         self,
@@ -48,20 +53,20 @@ class SensorModel:
             # 视场角 FOV 滤除
             rel_angle = np.arctan2(dy, dx) - ego_state.heading
             rel_angle = np.arctan2(np.sin(rel_angle), np.cos(rel_angle))
-            if np.abs(rel_angle) > (self.fov_rad / 2.0):
+            if np.abs(rel_angle) > (self.fov_rad / 2.0) and dist > 1e-6:
                 continue
 
             # 叠加高斯噪声模拟真实传感器感知特性
             noisy_obs = ObstacleState(
                 id=obs.id,
                 obstacle_type=obs.obstacle_type,
-                x=obs.x + np.random.normal(0, self.pos_noise_std),
-                y=obs.y + np.random.normal(0, self.pos_noise_std),
+                x=obs.x + self.rng.normal(0, self.pos_noise_std),
+                y=obs.y + self.rng.normal(0, self.pos_noise_std),
                 length=obs.length,
                 width=obs.width,
                 heading=obs.heading,
-                vx=obs.vx + np.random.normal(0, self.vel_noise_std),
-                vy=obs.vy + np.random.normal(0, self.vel_noise_std),
+                vx=obs.vx + self.rng.normal(0, self.vel_noise_std),
+                vy=obs.vy + self.rng.normal(0, self.vel_noise_std),
                 predicted_trajectory=obs.predicted_trajectory
             )
             perceived.append(noisy_obs)

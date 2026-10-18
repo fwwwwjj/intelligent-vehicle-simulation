@@ -1,6 +1,7 @@
 """
-模型预测控制 (Model Predictive Control, MPC) 轨迹跟踪接口。
-在滚动有限时域内显式处理非线性车辆执行机构极限与动力学不等式约束。
+模型预测控制 (Model Predictive Control, MPC) 轨迹跟踪**接口骨架**。
+v0.2 未实现 QP 求解，调用 ``compute_control`` 会抛出 NotImplementedError；
+当前闭环请使用 LQRController。
 """
 
 from src.common.state import VehicleState, Trajectory
@@ -25,5 +26,7 @@ class MPCController(BaseController):
         """
         滚动时域求解最优控制序列并提取首个控制量
         """
-        # 接口骨架预留
-        return ControlCommand(steering_angle=0.0, acceleration=0.0)
+        # 接口骨架预留：避免调用方误以为已经得到有效控制量
+        raise NotImplementedError(
+            "MPCController is an interface skeleton in v0.2; use LQRController."
+        )

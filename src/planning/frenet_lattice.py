@@ -1,19 +1,30 @@
 """
 Frenet 时空坐标系下的 Lattice 多项式轨迹规划器 (Frenet Lattice Planner)。
-经典算法参考：Moritz Werling et al. "Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame", IEEE ICRA 2010.
+经典算法参考：Moritz Werling et al. "Optimal Trajectory Generation for Dynamic Street Scenarios
+in a Frenet Frame", IEEE ICRA 2010.
+
+本实现相对早期骨架的关键修正：
+1. 使用真实参考线（按弧长插值）做 Frenet -> Cartesian，不再用 y=0 的假参考点；
+2. 纵向五次多项式以“起点速度 -> 目标速度”的平均速度估计终点，紧急停车不会
+   出现 s 不单调或负速度；
+3. 每个轨迹点填充 theta / kappa / v / a / jerk，供控制器和代价函数使用；
+4. 候选轨迹按时间投影障碍物做 OBB 碰撞校验，碰撞轨迹标记 invalid 并重罚。
 """
 
-from typing import List
+from typing import List, Optional, Tuple
+
 import numpy as np
+
 from src.common.state import VehicleState, ObstacleState, Trajectory, TrajectoryPoint
 from src.common.frenet_frame import ReferencePoint, FrenetConverter, FrenetPoint
-from src.decision.base_decision import DecisionOutput, DrivingIntent
+from src.decision.base_decision import DecisionOutput
 from src.planning.base_planner import BasePlanner
 from src.planning.cost_evaluator import TrajectoryCostEvaluator
 
 
 class QuinticPolynomial:
     """五次多项式曲线: x(t) = a0 + a1*t + a2*t^2 + a3*t^3 + a4*t^4 + a5*t^5"""
+
     def __init__(self, xs: float, vxs: float, axs: float, xe: float, vxe: float, axe: float, T: float):
         self.a0 = xs
         self.a1 = vxs
@@ -22,20 +33,21 @@ class QuinticPolynomial:
         A = np.array([
             [T**3, T**4, T**5],
             [3 * T**2, 4 * T**3, 5 * T**4],
-            [6 * T, 12 * T**2, 20 * T**3]
+            [6 * T, 12 * T**2, 20 * T**3],
         ])
         b = np.array([
             xe - self.a0 - self.a1 * T - self.a2 * T**2,
             vxe - self.a1 - 2 * self.a2 * T,
-            axe - 2 * self.a2
+            axe - 2 * self.a2,
         ])
         try:
             x = np.linalg.solve(A, b)
-            self.a3 = x[0]
-            self.a4 = x[1]
-            self.a5 = x[2]
+            self.a3 = float(x[0])
+            self.a4 = float(x[1])
+            self.a5 = float(x[2])
         except np.linalg.LinAlgError:
             self.a3 = self.a4 = self.a5 = 0.0
+        self.T = float(T)
 
     def calc_point(self, t: float) -> float:
         return self.a0 + self.a1 * t + self.a2 * t**2 + self.a3 * t**3 + self.a4 * t**4 + self.a5 * t**5
@@ -54,9 +66,167 @@ class FrenetLatticePlanner(BasePlanner):
     """
     Frenet Lattice 采样轨迹规划器
     """
-    def __init__(self):
-        self.cost_evaluator = TrajectoryCostEvaluator()
 
+    def __init__(
+        self,
+        cost_evaluator: Optional[TrajectoryCostEvaluator] = None,
+        ego_length: float = 4.8,
+        ego_width: float = 1.9,
+        max_accel: float = 3.5,
+        max_decel: float = 7.0,
+    ):
+        self.cost_evaluator = cost_evaluator or TrajectoryCostEvaluator(
+            ego_length=ego_length,
+            ego_width=ego_width,
+            max_accel=max_accel,
+            max_decel=max_decel,
+        )
+        self.ego_length = ego_length
+        self.ego_width = ego_width
+        self.max_accel = max_accel
+        self.max_decel = max_decel
+
+    # ------------------------------------------------------------------
+    # 参考线兜底
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _fallback_reference_line(ego_state: VehicleState, length: float = 120.0) -> List[ReferencePoint]:
+        """没有参考线时，沿当前航向构造一条直线参考线，保证规划器可退化为直线行驶。"""
+        ref: List[ReferencePoint] = []
+        cos_h = float(np.cos(ego_state.heading))
+        sin_h = float(np.sin(ego_state.heading))
+        for i in range(int(length) + 1):
+            ref.append(
+                ReferencePoint(
+                    x=float(ego_state.x + i * cos_h),
+                    y=float(ego_state.y + i * sin_h),
+                    theta=float(ego_state.heading),
+                    kappa=0.0,
+                    dkappa=0.0,
+                    s=float(i),
+                )
+            )
+        return ref
+
+    # ------------------------------------------------------------------
+    # 微分几何后处理
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _fill_curvature(points: List[TrajectoryPoint]) -> None:
+        """由离散轨迹的 theta(s) 差分计算曲率与曲率变化率，保证 kappa 与几何一致。"""
+        n = len(points)
+        if n == 0:
+            return
+        if n == 1:
+            points[0].kappa = 0.0
+            points[0].dkappa = 0.0
+            return
+
+        kappas = np.zeros(n, dtype=float)
+        for i in range(n):
+            if i == 0:
+                ds = points[1].s - points[0].s
+                dtheta = points[1].theta - points[0].theta
+            elif i == n - 1:
+                ds = points[-1].s - points[-2].s
+                dtheta = points[-1].theta - points[-2].theta
+            else:
+                ds = points[i + 1].s - points[i - 1].s
+                dtheta = points[i + 1].theta - points[i - 1].theta
+            dtheta = float(np.arctan2(np.sin(dtheta), np.cos(dtheta)))
+            kappas[i] = dtheta / max(abs(ds), 1e-3)
+
+        s_array = np.array([p.s for p in points], dtype=float)
+        if n > 2 and np.all(np.diff(s_array) >= 0):
+            dkappas = np.gradient(kappas, s_array)
+        else:
+            dkappas = np.zeros(n, dtype=float)
+
+        for i, pt in enumerate(points):
+            pt.kappa = float(kappas[i])
+            pt.dkappa = float(dkappas[i])
+
+    # ------------------------------------------------------------------
+    # 单条候选轨迹
+    # ------------------------------------------------------------------
+    def _build_candidate(
+        self,
+        ego_frenet: FrenetPoint,
+        reference_line: List[ReferencePoint],
+        target_speed: float,
+        target_l: float,
+        horizon: float,
+        dt: float,
+    ) -> Optional[Trajectory]:
+        v0 = max(0.0, ego_frenet.s_d)
+        target_speed = max(0.0, target_speed)
+        # 用平均速度估计终点，避免停车目标时 s_end == s_start 导致非单调
+        s_end = ego_frenet.s + 0.5 * (v0 + target_speed) * horizon
+        if s_end < ego_frenet.s:
+            s_end = ego_frenet.s
+
+        poly_s = QuinticPolynomial(
+            xs=ego_frenet.s,
+            vxs=v0,
+            axs=ego_frenet.s_dd,
+            xe=s_end,
+            vxe=target_speed,
+            axe=0.0,
+            T=horizon,
+        )
+        # 横向多项式的初始侧向速度取“朝目标车道的期望换道率”，而不是
+        # v*sin(Δθ)。后者会把航向误差当成换道初速度，逐帧重规划形成正反馈；
+        # 取 0 又会让每次重规划都从静止起步，5s 内几乎不产生横向位移。
+        lateral_error = target_l - ego_frenet.l
+        l_d0 = float(np.clip(0.8 * lateral_error, -1.2, 1.2))
+        poly_l = QuinticPolynomial(
+            xs=ego_frenet.l,
+            vxs=l_d0,
+            axs=0.0,
+            xe=target_l,
+            vxe=0.0,
+            axe=0.0,
+            T=horizon,
+        )
+
+        points: List[TrajectoryPoint] = []
+        steps = max(2, int(round(horizon / dt)) + 1)
+        for k in range(steps):
+            t = min(k * dt, horizon)
+            s_t = poly_s.calc_point(t)
+            s_d = poly_s.calc_first_derivative(t)
+            s_dd = poly_s.calc_second_derivative(t)
+            s_ddd = poly_s.calc_third_derivative(t)
+            l_t = poly_l.calc_point(t)
+            l_d = poly_l.calc_first_derivative(t)
+            l_dd = poly_l.calc_second_derivative(t)
+            l_prime = l_d / max(1e-3, abs(s_d)) if abs(s_d) > 0.5 else 0.0
+
+            ref_pt = FrenetConverter.ref_point_at_s(reference_line, s_t)
+            f_pt = FrenetPoint(
+                s=s_t,
+                s_d=s_d,
+                s_dd=s_dd,
+                s_ddd=s_ddd,
+                l=l_t,
+                l_d=l_d,
+                l_dd=l_dd,
+                l_prime=l_prime,
+                l_prime_prime=0.0,
+            )
+            c_pt = FrenetConverter.frenet_to_cartesian(f_pt, ref_pt)
+            c_pt.t = float(t)
+            c_pt.s = float(s_t)
+            c_pt.a = float(s_dd)
+            c_pt.jerk = float(s_ddd)
+            points.append(c_pt)
+
+        self._fill_curvature(points)
+        return Trajectory(points=points)
+
+    # ------------------------------------------------------------------
+    # 主入口
+    # ------------------------------------------------------------------
     def plan(
         self,
         ego_state: VehicleState,
@@ -64,61 +234,66 @@ class FrenetLatticePlanner(BasePlanner):
         obstacles: List[ObstacleState],
         decision: DecisionOutput,
         plan_time_horizon: float = 5.0,
-        dt: float = 0.1
+        dt: float = 0.1,
     ) -> Trajectory:
-        """
-        采样纵向时序与横向偏移，生成候选轨迹簇，评估并筛选全局最优无碰撞且动力学平滑轨迹
-        """
-        # 1. 自车状态变换至 Frenet 坐标
+        """采样横向偏移与纵向时间窗，评估并返回综合代价最低的可行轨迹。"""
+        if not reference_line:
+            reference_line = self._fallback_reference_line(ego_state)
+
         ego_frenet = FrenetConverter.cartesian_to_frenet(ego_state, reference_line)
+        target_speed = max(0.0, float(decision.target_speed))
 
-        # 2. 横向与纵向末态离散采样空间 (Sampling Space)
-        # 横向目标偏移 l 采样: 居中 0, 左偏, 右偏
-        target_l_samples = [decision.lateral_shift_l, decision.lateral_shift_l - 0.5, decision.lateral_shift_l + 0.5]
-        # 时间窗采样 T: [3.5s, 4.0s, 4.5s, 5.0s]
-        t_samples = [3.5, 4.0, 5.0]
+        base_l = float(decision.lateral_shift_l)
+        # 附近有障碍物时才启用 ±0.5m 横向避让候选，否则只跟踪目标车道中心，
+        # 既减少无意义候选，也降低 50Hz 下的规划耗时。
+        # 只有“前方 30m 内”的障碍物才值得启用 ±0.5m 横向避让候选；
+        # 后方来车由决策层的跟驰/汇入安全条件处理，不应让规划器做无意义绕行。
+        nearby_obstacle = any(
+            obs.x > ego_state.x - 2.0
+            and float(np.hypot(obs.x - ego_state.x, obs.y - ego_state.y)) < 30.0
+            for obs in obstacles
+        )
+        if nearby_obstacle:
+            lateral_targets = sorted({base_l, base_l - 0.5, base_l + 0.5})
+        else:
+            lateral_targets = [base_l]
+        horizons = sorted({
+            max(4.0, plan_time_horizon * 0.8),
+            max(4.0, plan_time_horizon),
+        })
+        # 只把 80m 内的障碍物送入碰撞检查
+        relevant_obstacles = [
+            obs for obs in obstacles
+            if float(np.hypot(obs.x - ego_state.x, obs.y - ego_state.y)) < 80.0
+        ]
 
-        candidate_trajectories: List[Trajectory] = []
-
-        # 3. 多项式曲线解算与离散化
-        for t_horizon in t_samples:
-            for l_target in target_l_samples:
-                # 生成横向五次多项式
-                poly_l = QuinticPolynomial(
-                    xs=ego_frenet.l, vxs=ego_frenet.l_d, axs=ego_frenet.l_dd,
-                    xe=l_target, vxe=0.0, axe=0.0, T=t_horizon
+        candidates: List[Trajectory] = []
+        for horizon in horizons:
+            for target_l in lateral_targets:
+                traj = self._build_candidate(
+                    ego_frenet=ego_frenet,
+                    reference_line=reference_line,
+                    target_speed=target_speed,
+                    target_l=target_l,
+                    horizon=horizon,
+                    dt=dt,
                 )
-
-                # 生成纵向多项式 (巡航模式下以期望速度推进)
-                s_end = ego_frenet.s + decision.target_speed * t_horizon
-                poly_s = QuinticPolynomial(
-                    xs=ego_frenet.s, vxs=ego_frenet.s_d, axs=ego_frenet.s_dd,
-                    xe=s_end, vxe=decision.target_speed, axe=0.0, T=t_horizon
+                if traj is None or not traj.points:
+                    continue
+                self.cost_evaluator.evaluate(traj, relevant_obstacles, target_speed, dt=dt)
+                # 参考线依从度：偏离目标车道中心越远，代价越高（避免无必要地
+                # 选择 ±0.5m 的候选轨迹，同时保留避障时的横向自由度）
+                lateral_penalty = (
+                    self.cost_evaluator.w_ref_deviation
+                    * abs(target_l - base_l)
+                    * horizon
                 )
+                traj.total_cost += float(lateral_penalty)
+                candidates.append(traj)
 
-                # 合成笛卡尔空间轨迹序列
-                points: List[TrajectoryPoint] = []
-                steps = int(t_horizon / dt)
-                for step_idx in range(steps):
-                    t = step_idx * dt
-                    s_t = poly_s.calc_point(t)
-                    s_d_t = poly_s.calc_first_derivative(t)
-                    s_dd_t = poly_s.calc_second_derivative(t)
-                    l_t = poly_l.calc_point(t)
-                    l_d_t = poly_l.calc_first_derivative(t)
+        if not candidates:
+            return Trajectory(points=[], valid=False)
 
-                    f_pt = FrenetPoint(s=s_t, s_d=s_d_t, s_dd=s_dd_t, l=l_t, l_d=l_d_t)
-                    # 查找对应参考线点并转换
-                    # 简化的直线参考映射示例:
-                    ref_dummy = ReferencePoint(x=s_t, y=0.0, theta=0.0, kappa=0.0, s=s_t)
-                    c_pt = FrenetConverter.frenet_to_cartesian(f_pt, ref_dummy)
-                    c_pt.t = t
-                    points.append(c_pt)
-
-                traj = Trajectory(points=points)
-                self.cost_evaluator.evaluate(traj, obstacles, decision.target_speed)
-                candidate_trajectories.append(traj)
-
-        # 4. 选取代价最低的最优轨迹
-        best_trajectory = min(candidate_trajectories, key=lambda t: t.total_cost, default=Trajectory())
-        return best_trajectory
+        valid = [traj for traj in candidates if traj.valid]
+        pool = valid if valid else candidates
+        return min(pool, key=lambda traj: traj.total_cost)

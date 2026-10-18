@@ -1,7 +1,8 @@
 """
-基于二次规划 (Quadratic Programming, QP) 与时空解耦的 EM 规划器接口 (EM Planner)。
-业界工业级标杆架构（参考 Baidu Apollo EM Planner 路径-速度解耦体系）。
-分为横向路径规划 (Path Optimizer) 与纵向时空速度规划 (Speed Optimizer on ST-Graph)。
+基于二次规划 (Quadratic Programming, QP) 与时空解耦的 EM 规划器**接口骨架**。
+参考 Baidu Apollo EM Planner 的路径-速度解耦体系，但 v0.2 只保留 STGraph 数据结构
+与 _optimize_path/_optimize_speed 接口，尚未实现 QP 求解；调用 plan 会抛出
+NotImplementedError。
 """
 
 from typing import List, Tuple
@@ -58,7 +59,10 @@ class EMPlanner(BasePlanner):
         speed_profile = self._optimize_speed(ego_state, st_graph, decision)
 
         # 3. 缝合 Path 与 Speed 生成时空完整轨迹
-        return Trajectory(points=[])
+        raise NotImplementedError(
+            "EMPlanner is an interface skeleton in v0.2: "
+            "path/speed QP solvers are not implemented. Use FrenetLatticePlanner."
+        )
 
     def _optimize_path(self, ego_state: VehicleState, ref_line: List[ReferencePoint], obstacles: List[ObstacleState]):
         """QP 形式化: min w1*||l||^2 + w2*||l'||^2 + w3*||l''||^2 s.t. 边界走廊约束"""

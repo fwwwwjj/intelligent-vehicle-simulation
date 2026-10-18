@@ -1,97 +1,75 @@
 #!/usr/bin/env python3
 """
-单场景交互式数字仿真运行脚本
-提供基于配置文件的仿真环境加载、闭环控制与动态可视化演示
+单场景闭环仿真运行脚本。
+从 configs/scenarios/*.yaml（或内置场景）加载路网、自车与障碍物，
+装配 FSM/博弈决策、Frenet Lattice 规划、LQR 控制，输出真实 KPI。
 """
 
-import sys
-import os
 import argparse
+import json
+import os
+import sys
+from dataclasses import asdict
+from pathlib import Path
 
 # 将项目根目录添加至系统路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.common.state import VehicleState, ObstacleState, ObstacleType
-from src.environment.road_network import RoadNetwork, Lane
-from src.environment.obstacle_manager import ObstacleManager, IntelligentDriverModel
-from src.decision.rule_based_fsm import HierarchicalFSMDecisionMaker
-from src.decision.game_theoretic import GameTheoreticDecisionMaker
-from src.planning.frenet_lattice import FrenetLatticePlanner
-from src.control.lqr_controller import LQRController
-from src.simulator import SimulationEngine
+from src.environment.scenario_loader import load_named_scenario, load_scenario
+from src.runner import build_engine
 
 
 def main():
     parser = argparse.ArgumentParser(description="智能车辆行为决策与路径规划数字仿真系统")
-    parser.add_argument("--scenario", type=str, default="highway_merge", help="场景名称")
-    parser.add_argument("--decision", type=str, default="fsm", choices=["fsm", "game"], help="决策算法: fsm 或 game")
-    parser.add_argument("--duration", type=float, default=15.0, help="仿真运行时长 (秒)")
+    parser.add_argument("--scenario", type=str, default="highway_merge", help="场景名称或 YAML/JSON 路径")
+    parser.add_argument("--decision", type=str, default="fsm", choices=["fsm", "game"], help="决策算法")
+    parser.add_argument("--duration", type=float, default=20.0, help="仿真运行时长 (秒)")
     parser.add_argument("--no_vis", action="store_true", help="禁用实时可视化窗口")
+    parser.add_argument("--seed", type=int, default=None, help="随机种子；默认使用场景配置")
+    parser.add_argument("--config", type=str, default=None, help="默认配置文件路径")
+    parser.add_argument("--save_results", action="store_true", help="保存逐帧 telemetry JSON 与 KPI")
+    parser.add_argument("--dynamic", action="store_true", help="使用 2-DOF 动力学模型")
     args = parser.parse_args()
 
-    print(f"==================================================")
-    print(f"启动智能车辆仿真系统 - 中国仿真创新应用大赛")
-    print(f"当前测试场景: {args.scenario}")
-    print(f"选用决策模块: {args.decision.upper()}")
-    print(f"==================================================")
+    if args.scenario.endswith((".yaml", ".yml", ".json")):
+        scenario = load_scenario(args.scenario, config_path=args.config)
+    else:
+        scenario = load_named_scenario(args.scenario)
 
-    # 1. 搭建数字路网
-    road_network = RoadNetwork()
-    lane_0 = Lane(
-        lane_id="main_lane_0",
-        center_points=[(float(x), 0.0) for x in range(0, 300, 2)]
-    )
-    road_network.add_lane(lane_0)
-    road_network.generate_reference_line("main_lane_0")
+    print("==================================================")
+    print("启动智能车辆仿真系统 - 中国仿真创新应用大赛")
+    print(f"场景: {scenario.name}  |  {scenario.description}")
+    print(f"决策: {args.decision.upper()}  |  步长: {scenario.dt:.3f}s  |  种子: {args.seed or scenario.seed}")
+    print("==================================================")
 
-    # 2. 初始化环境障碍物
-    obs_manager = ObstacleManager()
-    lead_car = ObstacleState(
-        id="obs_lead_01",
-        obstacle_type=ObstacleType.CAR,
-        x=50.0,
-        y=0.0,
-        length=4.8,
-        width=1.9,
-        heading=0.0,
-        vx=15.0,
-        vy=0.0
-    )
-    obs_manager.add_obstacle(lead_car, IntelligentDriverModel(v0=16.0))
-
-    # 3. 初始化主车状态
-    ego_init = VehicleState(
-        x=0.0,
-        y=0.0,
-        heading=0.0,
-        velocity=18.0,
-        vx=18.0
-    )
-
-    # 4. 装配决策与规划算法
-    decision_maker = HierarchicalFSMDecisionMaker() if args.decision == "fsm" else GameTheoreticDecisionMaker()
-    planner = FrenetLatticePlanner()
-    controller = LQRController()
-
-    # 5. 实例化仿真引擎并运行
-    engine = SimulationEngine(
-        road_network=road_network,
-        obstacle_manager=obs_manager,
-        decision_maker=decision_maker,
-        planner=planner,
-        controller=controller,
-        ego_initial_state=ego_init,
+    engine = build_engine(
+        scenario,
+        decision=args.decision,
+        seed=args.seed,
         enable_visualization=not args.no_vis,
-        dt=0.05
+        use_dynamic_model=args.dynamic,
     )
 
     print(">>> 仿真运行中...")
     report = engine.run(max_duration=args.duration)
 
     print("\n---------------- 仿真评测 KPI 报告 ----------------")
-    for k, v in report.items():
-        print(f"  {k:30s}: {v:.4f}")
+    for key, value in report.items():
+        print(f"  {key:30s}: {value:.4f}")
     print("--------------------------------------------------")
+
+    if args.save_results:
+        out_dir = Path("results")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        suffix = f"{scenario.name}_{args.decision}_seed{args.seed or scenario.seed}"
+        telemetry_path = out_dir / f"telemetry_{suffix}.json"
+        report_path = out_dir / f"kpi_{suffix}.json"
+        with telemetry_path.open("w", encoding="utf-8") as fh:
+            json.dump([asdict(record) for record in engine.evaluator.records], fh, ensure_ascii=False, indent=2)
+        with report_path.open("w", encoding="utf-8") as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=2)
+        print(f">>> 逐帧数据: {telemetry_path}")
+        print(f">>> KPI 报告: {report_path}")
 
 
 if __name__ == "__main__":

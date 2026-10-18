@@ -1,9 +1,11 @@
 """
 动态交通参与者管理与时空轨迹预测接口。
 支持微观交通流行为演化模型：
-1. 智能驾驶员纵向跟驰模型 (IDM, Intelligent Driver Model)
-2. 协同换道模型 (MOBIL, Minimizing Overall Braking Induced by Lane change)
-满足中国仿真创新应用大赛对于“交通流自然演化高保真度”的高分评审标准。
+1. 智能驾驶员纵向跟驰模型 (IDM, Intelligent Driver Model) —— 已接入 step()；
+2. 协同换道模型 (MOBIL, Minimizing Overall Braking Induced by Lane change) ——
+   仅保留判定公式，尚未接入换道状态机。
+
+当前 ``step()`` 对注册了 IDM 的车辆做跟驰更新，其余车辆保持匀速。
 """
 
 from typing import List, Dict, Optional
@@ -93,16 +95,56 @@ class ObstacleManager:
         if idm is not None:
             self.idm_models[obstacle.id] = idm
 
+    def _find_lead(self, obstacle: ObstacleState) -> Optional[ObstacleState]:
+        """在当前障碍物同车道正前方寻找最近前车（直线道路按横向距离分道）。"""
+        lead = None
+        min_gap = float("inf")
+        for other in self.obstacles.values():
+            if other.id == obstacle.id:
+                continue
+            if other.x <= obstacle.x:
+                continue
+            lateral_gap = abs(other.y - obstacle.y)
+            if lateral_gap > 0.5 * (obstacle.width + other.width) + 0.5:
+                continue
+            gap = other.x - obstacle.x - 0.5 * (obstacle.length + other.length)
+            if gap < min_gap:
+                min_gap = gap
+                lead = other
+        return lead
+
     def step(self, dt: float) -> None:
         """
-        环境物理演化一个时步 dt
-        更新所有交通参与者的一阶/二阶运动状态
+        环境物理演化一个时步 dt。
+        注册了 IDM 的交通参与者按跟驰模型更新纵向速度；其余参与者保持匀速。
         """
+        # 先基于当前状态计算加速度，再统一积分，避免同一时步内顺序依赖
+        accelerations: Dict[str, float] = {}
         for obs_id, obs in self.obstacles.items():
+            idm = self.idm_models.get(obs_id)
+            if idm is None:
+                accelerations[obs_id] = 0.0
+                continue
+            lead = self._find_lead(obs)
+            if lead is None:
+                free_accel = idm.a_max * (1.0 - (obs.vx / max(1e-3, idm.v0)) ** 4)
+                accelerations[obs_id] = float(np.clip(free_accel, -7.0, idm.a_max))
+            else:
+                gap = lead.x - obs.x - 0.5 * (obs.length + lead.length)
+                accelerations[obs_id] = idm.compute_acceleration(
+                    current_speed=obs.vx,
+                    lead_speed=max(0.0, lead.vx),
+                    distance=max(0.1, gap),
+                )
+
+        for obs_id, obs in self.obstacles.items():
+            accel = accelerations.get(obs_id, 0.0)
+            obs.vx = float(max(0.0, obs.vx + accel * dt))
+            if abs(obs.vx) > 1e-6 or abs(obs.vy) > 1e-6:
+                obs.heading = float(np.arctan2(obs.vy, obs.vx))
             obs.x += obs.vx * dt
             obs.y += obs.vy * dt
-            # 更新未来预测轨迹序列
-            self.generate_predicted_trajectory(obs_id, horizon=5.0, dt=0.2)
+            self.generate_predicted_trajectory(obs_id, horizon=6.0, dt=0.2)
 
     def generate_predicted_trajectory(self, obstacle_id: str, horizon: float = 5.0, dt: float = 0.2) -> List[TrajectoryPoint]:
         """

@@ -1,0 +1,28 @@
+# 场景描述: 前方静止车辆紧急制动 (Emergency Avoidance)
+scenario_id: "SCENARIO_EMERGENCY_AVOIDANCE_01"
+description: "主车巡航时前方车道出现静止车辆，验证跟驰减速与紧急制动闭环"
+
+map:
+  type: "highway_straight"
+  main_lanes_count: 2
+  road_length: 500.0
+  ramp_length: 1.0
+  lane_width: 3.75
+  speed_limit: 22.22
+
+ego_initial_state:
+  x: 0.0
+  y: 0.0
+  v: 20.0
+  heading: 0.0
+  lane_id: "main_lane_0"
+
+obstacles:
+  - id: "obs_stopped"
+    type: "car"
+    initial_state: {x: 90.0, y: 0.0, v: 0.0, heading: 0.0, lane_id: "main_lane_0"}
+    behavior_type: "constant_speed"
+  - id: "obs_left_lane"
+    type: "car"
+    initial_state: {x: 40.0, y: 3.75, v: 25.0, heading: 0.0, lane_id: "main_lane_1"}
+    behavior_type: "constant_speed"

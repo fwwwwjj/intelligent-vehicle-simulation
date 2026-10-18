@@ -13,6 +13,7 @@
 - [三、 核心模块数据流与调用拓扑 (Dataflow & Topology)](#三-核心模块数据流与调用拓扑-dataflow--topology)
 - [四、 模块职责边界与修改扩展契约 (Invariants & Extension Contracts)](#四-模块职责边界与修改扩展契约-invariants--extension-contracts)
 - [五、 后续 AI 工具修改代码操作守则 (AI Prompt & Development Rules)](#五-后续-ai-工具修改代码操作守则-ai-prompt--development-rules)
+- [六、 当前实现边界与验收口径（v0.2）](#六-当前实现边界与验收口径v02)
 
 ---
 
@@ -173,6 +174,54 @@ sequenceDiagram
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
 3. 【坐标变换】：任何从笛卡尔坐标系到道路参考线的映射，必须统一调用 src.common.frenet_frame.FrenetConverter，严禁在各算法内部私自重复编写易出错的坐标旋转方程。
-4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过。
+4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 15 项）。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
 ```
+
+
+---
+
+## 六、 当前实现边界与验收口径（v0.2）
+
+> 本节用于防止“接口预留”被写成“已完成”。修改代码或文档前，先对照下表。
+
+### 1. 已进入闭环的模块
+
+| 模块 | 入口 | 验收方式 |
+| :--- | :--- | :--- |
+| 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；内置 `highway_merge`、`emergency_avoidance` |
+| 道路参考线 | `src/environment/road_network.py` | 生成真实 `s/theta/kappa`，按位置查车道 |
+| Frenet 映射 | `src/common/frenet_frame.py` | 正交投影 + `ref_point_at_s` 插值 |
+| 轨迹规划 | `src/planning/frenet_lattice.py` | 五次多项式 + 时间投影 OBB 碰撞校验 + 曲率/jerk 填充 |
+| 行为决策 | `src/decision/rule_based_fsm.py` / `game_theoretic.py` | 跟驰、汇入、紧急停车；2×2 收益矩阵 |
+| 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
+| 纵向控制 | `src/control/pid_controller.py` | 测量值微分 + 抗积分饱和 |
+| 车辆模型 | `src/vehicle_model/kinematics.py` / `dynamics.py` | 运动学 / 2-DOF 线性轮胎 |
+| KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、OBB 净距、TTC、横向/航向误差、Δa/Δt jerk、时延拆分 |
+| 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 多决策 × 多场景，输出 JSON/CSV |
+
+### 2. 仅接口预留 / 未实现
+
+| 功能 | 现状 | 禁止表述 |
+| :--- | :--- | :--- |
+| highD / INTERACTION / NGSIM | `dataset_loader.py` 返回元数据或空列表，无数据文件 | “已用真实数据标定” |
+| EM / QP 规划 | `em_planner.py` 返回空 `Trajectory` | “已实现 EM 规划器” |
+| MPC | `mpc_controller.py` 返回零指令 | “已实现 MPC 跟踪” |
+| Pacejka 轮胎 | `pacejka_tire_model()` 未被 `step()` 调用 | “已采用 Pacejka 非线性轮胎” |
+| MOBIL | 公式类存在，未进入 `ObstacleManager.step()` | “已实现 MOBIL 换道” |
+| OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
+
+### 3. 指标口径
+
+- **碰撞**：OBB + SAT，`buffer=0`；任一步相交即 `is_collision=True`。
+- **最小净距**：矩形边界最短距离，不是中心点距离。
+- **TTC**：仅前方、横向重叠目标，`gap / closing_speed`；无接近目标记 999。
+- **Jerk**：实际加速度差分 `Δa/Δt`，不是轨迹理论值。
+- **横向误差**：自车到规划轨迹最近点的 cross-track 误差。
+- **时延**：决策、规划、控制分别计时，禁止合并成一个 `planning_latency_ms`。
+
+### 4. 结果可信度
+
+- 结果表必须由 `scripts/run_benchmark.py` 或 `scripts/run_simulation.py --save_results` 生成；
+- 至少报告 seed、场景、时长、样本数；单 seed 结果不得写成统计结论；
+- 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用。

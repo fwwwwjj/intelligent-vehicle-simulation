@@ -18,23 +18,45 @@ intelligent-vehicle-simulation/
 │   └── 05_references.md        # 权威学术参考文献与国际行业标准规范
 ├── src/                        # 核心仿真引擎与高保真算法接口实现
 │   ├── common/                 # 车辆状态、Frenet双向映射、OBB几何碰撞检测
-│   ├── environment/            # 数字路网、动态交通参与者 IDM 模型与数据加载器
-│   ├── vehicle_model/          # 自行车运动学、2-DOF横向动力学与传感器数字模型
-│   ├── decision/               # 分层有限状态机 (HFSM) 与博弈交互决策器
-│   ├── planning/               # Frenet Lattice 多项式规划器与 EM/QP 时空优化器
-│   ├── control/                # 离散 LQR 横向跟踪 (带曲率前馈) 与纵向双 PID 控制器
-│   ├── evaluation/             # 仿真指标量化计算器与批量回归基准评测套件
-│   ├── visualization/          # 2D BEV 实时交互动画引擎与科研图表导出工具
-│   └── simulator.py            # 端到端闭环仿真主引擎核心控制器
+│   ├── environment/            # 道路网络、场景加载、IDM 跟驰；MOBIL/真实数据为接口预留
+│   │   ├── road_network.py     # 车道拓扑与真实 s/theta/kappa 参考线
+│   │   ├── scenario_loader.py  # YAML/JSON 场景 -> 路网/障碍物/自车
+│   │   ├── obstacle_manager.py # IDM 步进与预测轨迹
+│   │   └── dataset_loader.py   # highD/INTERACTION/NGSIM 接口骨架（未接入数据）
+│   ├── vehicle_model/          # 运动学、2-DOF 线性轮胎、传感器模型；Pacejka 预留
+│   ├── decision/               # 分层有限状态机 (HFSM) 与收益矩阵博弈决策
+│   ├── planning/               # Frenet Lattice + OBB 碰撞校验；EM/QP 预留
+│   ├── control/                # LQR 横向跟踪 + 曲率前馈 + 纵向 PID；MPC 预留
+│   ├── evaluation/             # 真实 KPI 计算器与批量回归基准评测套件
+│   ├── visualization/          # 2D BEV 实时动画与真实遥测图表
+│   ├── runner.py               # 场景 -> 决策/规划/控制/引擎装配工厂
+│   └── simulator.py            # 端到端闭环仿真主引擎 (SimulationEngine)
 ├── scripts/                    # 自动化运行脚本与演示入口
 │   ├── run_simulation.py       # 单场景交互式可视化仿真运行入口
 │   ├── run_benchmark.py        # 批量基准压力测试与评分脚本
 │   └── export_results.py       # 竞赛申报书科研分析图表导出脚本
-└── tests/                      # 单元测试与接口集成测试套件
-    ├── test_coordinates.py     # 坐标变换准确性校验
-    ├── test_vehicle_model.py   # 运动学与动力学积分步进测试
-    ├── test_planners.py        # 多项式轨迹连续性检验
-    └── test_controllers.py     # LQR 与 PID 控制器稳定性测试
+└── tests/                      # 单元测试与闭环回归测试套件
+    ├── test_coordinates.py     # 坐标变换与 OBB/SAT
+    ├── test_vehicle_model.py   # 运动学与动力学积分步进
+    ├── test_planners.py        # 五次多项式边界条件
+    ├── test_controllers.py     # LQR 与 PID 控制器
+    └── test_closed_loop.py     # 真实参考线、碰撞指标、速度跟踪与 seed 复现
+```
+
+---
+
+### 1.1 回归测试与结果复现
+
+```bash
+# 当前 15 项测试
+python3 -m unittest discover tests -v
+
+# 闭环仿真 + KPI
+python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
+
+# 批量评测（结果写入 results/benchmark.json / csv）
+python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance \
+  --decisions fsm game --seeds 42 --duration 20
 ```
 
 ---

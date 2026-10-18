@@ -1,33 +1,33 @@
 # 场景描述: 高速公路主线汇入场景 (Highway Merging)
 scenario_id: "SCENARIO_HIGHWAY_MERGE_01"
-description: "主车从匝道加速汇入主线车流，需与主线前后来车协同博弈并平滑合流"
+description: "主车从匝道加速汇入主线车流，需与主线前后来车协同并平滑合流"
 
 map:
   type: "highway_on_ramp"
-  main_lanes_count: 3
-  ramp_length: 150.0
-  merge_zone_start_s: 80.0
-  merge_zone_end_s: 180.0
+  main_lanes_count: 2          # main_lane_0 (y=0), main_lane_1 (y=3.75)
+  ramp_length: 600.0
+  road_length: 600.0
   lane_width: 3.75
+  speed_limit: 22.22
 
 ego_initial_state:
   x: 0.0
-  y: -3.75
+  y: -3.75                     # 匝道位于主线右侧
   v: 15.0
-  heading: 0.05
+  heading: 0.0
   lane_id: "ramp_0"
 
 obstacles:
   - id: "obs_lead_main"
     type: "car"
-    initial_state: {x: 70.0, y: 0.0, v: 20.0, heading: 0.0, lane_id: "main_lane_1"}
+    initial_state: {x: 70.0, y: 0.0, v: 20.0, heading: 0.0, lane_id: "main_lane_0"}
     behavior_type: "constant_speed"
   - id: "obs_rear_main"
     type: "car"
-    initial_state: {x: 20.0, y: 0.0, v: 22.0, heading: 0.0, lane_id: "main_lane_1"}
-    behavior_type: "idm" # 智能驾驶员跟驰模型
+    initial_state: {x: -15.0, y: 0.0, v: 22.0, heading: 0.0, lane_id: "main_lane_0"}
+    behavior_type: "idm"       # 智能驾驶员跟驰模型
     idm_params: {desired_speed: 24.0, s0: 4.0, T: 1.5, a_max: 2.0, b_desired: 2.5}
   - id: "obs_fast_left"
     type: "car"
-    initial_state: {x: 40.0, y: 3.75, v: 28.0, heading: 0.0, lane_id: "main_lane_2"}
+    initial_state: {x: 40.0, y: 3.75, v: 28.0, heading: 0.0, lane_id: "main_lane_1"}
     behavior_type: "constant_speed"

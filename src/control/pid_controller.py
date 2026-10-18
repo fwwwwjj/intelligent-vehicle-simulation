@@ -19,6 +19,8 @@ class LongitudinalPIDController:
 
         self._integral_error = 0.0
         self._prev_error = 0.0
+        self._prev_speed = None
+        self._prev_speed: float | None = None
 
     def compute(self, target_speed: float, current_speed: float, dt: float) -> float:
         """
@@ -34,13 +36,20 @@ class LongitudinalPIDController:
         # 抗积分饱和限幅
         self._integral_error = float(np.clip(self._integral_error, -5.0, 5.0))
 
-        derivative = (error - self._prev_error) / max(1e-4, dt)
+        # 微分作用在“测量值”上，避免目标速度阶跃时产生微分冲击 (derivative kick)
+        if self._prev_speed is None:
+            derivative = 0.0
+        else:
+            derivative = (current_speed - self._prev_speed) / max(1e-4, dt)
+        self._prev_speed = current_speed
         self._prev_error = error
 
-        accel = self.kp * error + self.ki * self._integral_error + self.kd * derivative
+        accel = self.kp * error + self.ki * self._integral_error - self.kd * derivative
         return float(np.clip(accel, -self.max_decel, self.max_accel))
 
     def reset(self) -> None:
         """重置控制器历史内部状态"""
         self._integral_error = 0.0
         self._prev_error = 0.0
+        self._prev_speed = None
+        self._prev_speed: float | None = None
