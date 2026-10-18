@@ -83,7 +83,7 @@
 | `a` | `float` | $\text{m/s}^2$ | 期望切向加速度 |
 | `jerk` | `float` | $\text{m/s}^3$ | 加加速度 $\dot{a}$，用于衡量舒适性 |
 | `t` | `float` | $\text{s}$ | 相对规划起点的到达时间；v0.2 统一使用相对时间 |
-| `s` | `float` | $\text{m}$ | 沿规划路径的累积弧长 |
+| `s` | `float` | $\text{m}$ | 沿参考线的纵向弧长（v0.2 直接使用 Frenet $s$；大横向偏移时与实际路径弧长有差异） |
 
 ### 3. Frenet 时空坐标状态变量 (`FrenetPoint`)
 | 变量名 | Python 类型 | 物理量纲 (单位) | 详细含义说明 |
@@ -98,7 +98,7 @@
 | `l_prime` | `float` | 无量纲 | 横向对弧长的一阶导 $l' = dl/ds$ |
 | `l_prime_prime` | `float` | $\text{m}^{-1}$ | 横向对弧长的二阶导 $l'' = d^2l/ds^2$ |
 
-> **v0.2 实现说明**：`cartesian_to_frenet` 目前把 `l_prime_prime` 置 0，`frenet_to_cartesian` 的解析曲率因此只是近似；`FrenetLatticePlanner` 在生成离散点后会用 $\theta(s)$ 差分重新填充 `kappa/dkappa`。高精度曲率需要补全 $l''$ 解析式或改用样条。
+> **v0.2 实现说明**：`cartesian_to_frenet` 目前把 `l_prime_prime` 置 0，`s_dd` 用 $a_x\cos\Delta\theta$ 近似，`frenet_to_cartesian` 的解析曲率因此只是近似；`FrenetLatticePlanner` 在生成离散点后会用 $\theta(s)$ 差分重新填充 `kappa/dkappa`。高精度曲率需要补全 $l''$ 解析式或改用样条。
 
 ### 4. 执行控制输出量 (`ControlCommand`)
 | 变量名 | 物理量纲 | 物理范围限制 | 说明 |
@@ -291,6 +291,8 @@ sequenceDiagram
 - **Jerk**：实际加速度差分 `Δa/Δt`，不是轨迹理论值。
 - **横向误差**：自车到规划轨迹最近点的 cross-track 误差。
 - **时延**：决策、规划、控制分别计时，禁止合并成一个 `planning_latency_ms`。
+- **碰撞计数**：`collision_count` 为逐帧碰撞障碍物数量之和；`collision_frames` 为发生碰撞的帧数；`success_rate` 是单次运行的 0/1 结果，不是批量统计率。
+- **长度口径**：`TrajectoryPoint.s` 是参考线站距，不是实际路径弧长；大横向偏移时两者有差异。
 
 ### 4. 结果可信度
 
