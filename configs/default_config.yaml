@@ -1,0 +1,45 @@
+# ==============================================================================
+# 面向智能车辆行为决策与路径规划的数字建模及仿真系统 - 全局默认配置
+# 中国仿真创新应用大赛参赛作品
+# ==============================================================================
+
+# 仿真时间与步长控制
+simulation:
+  time_step: 0.05              # 仿真时间步长 dt (秒)
+  max_simulation_time: 40.0    # 单次仿真最大执行时长 (秒)
+  random_seed: 42              # 随机种子，保证实验可复现性
+  logging_level: "INFO"        # 日志等级: DEBUG, INFO, WARNING, ERROR
+
+# 主车物理与数字孪生动力学参数 (基于标准中型轿车)
+ego_vehicle:
+  length: 4.8                  # 车长 (米)
+  width: 1.9                   # 车宽 (米)
+  wheelbase: 2.85              # 轴距 L (米)
+  front_overhang: 0.95         # 前悬 (米)
+  rear_overhang: 1.0           # 后悬 (米)
+  mass: 1600.0                 # 整车质量 (kg)
+  moment_inertia_z: 2500.0     # 绕Z轴转动惯量 Iz (kg*m^2)
+  cf: 120000.0                 # 前轮侧偏刚度 (N/rad)
+  cr: 120000.0                 # 后轮侧偏刚度 (N/rad)
+  lf: 1.35                     # 质心到前轴距离 (米)
+  lr: 1.50                     # 质心到后轴距离 (米)
+  max_steer_angle: 0.65        # 最大前轮转向角 (rad, 约37度)
+  max_steer_rate: 0.50         # 最大转向角速度 (rad/s)
+  max_accel: 3.5               # 最大驱动加速度 (m/s^2)
+  max_decel: 7.0               # 最大制动减速度 (m/s^2)
+  max_jerk: 4.0                # 最大加加速度限制，保障乘客舒适性 (m/s^3)
+
+# 传感器数字模型 (感知层抽象)
+sensor_model:
+  lidar_range: 80.0            # 激光雷达数字探测距离 (米)
+  lidar_fov: 360.0             # 视场角 (度)
+  camera_range: 120.0          # 前视相机探测距离 (米)
+  camera_fov: 90.0             # 前视相机视场角 (度)
+  noise_std_position: 0.05     # 感知位置高斯噪声标准差 (米)
+  noise_std_velocity: 0.10     # 感知速度高斯噪声标准差 (m/s)
+
+# 道路与环境参数
+environment:
+  lane_width: 3.75             # 标准车道宽度 (米)
+  speed_limit: 22.22           # 道路限速 (m/s, 约80km/h)
+  friction_coefficient: 0.85   # 路面附着系数 (干燥沥青路面)
