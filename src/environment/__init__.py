@@ -3,7 +3,11 @@
 """
 
 from src.environment.road_network import Lane, RoadNetwork
-from src.environment.obstacle_manager import ObstacleManager, IntelligentDriverModel
+from src.environment.obstacle_manager import (
+    ObstacleManager,
+    IntelligentDriverModel,
+    MOBILLaneChangeModel
+)
 from src.environment.dataset_loader import (
     BaseDatasetLoader,
     HighDDatasetLoader,
@@ -16,6 +20,7 @@ __all__ = [
     "RoadNetwork",
     "ObstacleManager",
     "IntelligentDriverModel",
+    "MOBILLaneChangeModel",
     "BaseDatasetLoader",
     "HighDDatasetLoader",
     "InteractionDatasetLoader",

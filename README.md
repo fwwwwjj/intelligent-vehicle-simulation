@@ -8,15 +8,18 @@
 
 > 本项目为**中国仿真创新应用大赛**参赛项目研发框架。针对智能车辆在复杂高动态、强交互道路场景下的行为决策与轨迹规划难题，构建了涵盖**高精数字道路环境**、**虚拟感知模型**、**博弈与规则分层决策**、**Frenet/EM 时空优化规划**、**LQR/MPC 动力学跟踪控制**及**多维度量化评估体系**的端到端数字孪生与仿真试验平台。
 
+> 📖 **开发者与 AI 协作规范指南**：本项目提供完备的系统开发与变量口径说明书，请直接参阅 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)。后续人类工程师或 AI 编码工具在进行算法修改、代码生成与扩展时，请严格以该文件作为单一真实数据源（SSOT）。
+
 ---
 
 ## 目录
 - [一、 参赛要求内容映射表](#一-参赛要求内容映射表)
 - [二、 系统整体架构与技术路线](#二-系统整体架构与技术路线)
 - [三、 核心模块与代码接口组织](#三-核心模块与代码接口组织)
-- [四、 快速上手与运行指南](#四-快速上手与运行指南)
-- [五、 仿真演示与实验对比](#五-仿真演示与实验对比)
-- [六、 参考文献与标准规范](#六-参考文献与标准规范)
+- [四、 开发者与 AI 协作规范 (AI_SYSTEM_SPEC)](#四-开发者与-ai-协作规范-ai_system_spec)
+- [五、 快速上手与运行指南](#五-快速上手与运行指南)
+- [六、 仿真演示与实验对比](#六-仿真演示与实验对比)
+- [七、 参考文献与标准规范](#七-参考文献与标准规范)
 
 ---
 
@@ -40,7 +43,7 @@
 
 ```mermaid
 flowchart LR
-    A["真实数据集<br/>(highD / INTERACTION)"] --> B["数字路网与交通流<br/>(IDM / RoadNetwork)"]
+    A["真实数据集<br/>(highD / INTERACTION)"] --> B["数字路网与交通流<br/>(IDM / MOBIL / RoadNetwork)"]
     B --> C["车载感知数字孪生<br/>(LiDAR / Camera FOV)"]
     C --> D["行为决策层<br/>(HFSM / Game-Theoretic)"]
     D --> E["时空轨迹规划层<br/>(Frenet Lattice / EM)"]
@@ -58,13 +61,15 @@ flowchart LR
 
 ```
 intelligent-vehicle-simulation/
+├── AI_SYSTEM_SPEC.md           # 核心系统规范：坐标系基准、变量命名字典与 AI 协作修改守则
+├── README.md                   # 项目综合介绍与快速指南
 ├── configs/                    # 仿真参数与典型场景配置 YAML
 │   ├── default_config.yaml     # 车辆物理参数、感知视场、仿真步长
 │   └── scenarios/              # 高速汇入、城市路口、紧急避撞场景定义
 ├── docs/                       # 比赛申报规范技术报告 (5大核心章节)
 ├── src/                        # 核心仿真引擎与算法接口
-│   ├── common/                 # 车辆状态、Frenet双向映射、OBB包围盒碰撞检测
-│   ├── environment/            # 数字道路网络拓扑、交通参与者IDM演化、真实数据集加载
+│   ├── common/                 # 车辆状态、Frenet双向映射、OBB包围盒 SAT 碰撞检测
+│   ├── environment/            # 数字道路网络拓扑、交通参与者 IDM/MOBIL 演化、真实数据集加载
 │   ├── vehicle_model/          # 自行车运动学、2-DOF横侧向动力学与非线性轮胎模型
 │   ├── decision/               # 分层有限状态机 (HFSM) 与博弈交互决策器接口
 │   ├── planning/               # Frenet Lattice 多项式采样与二次规划 EM 规划器
@@ -82,7 +87,18 @@ intelligent-vehicle-simulation/
 
 ---
 
-## 四、 快速上手与运行指南
+## 四、 开发者与 AI 协作规范 (AI_SYSTEM_SPEC)
+
+为了确保后续人类开发者与各 AI 辅助工具（Cursor, Copilot, Gemini, Claude）协同开发时不发生命名冲突或物理量纲偏差，系统统一确立了以下开发守则（详见 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)）：
+
+1. **统一物理量纲 (SI Units)**：所有时间统一为秒（$\text{s}$），距离与坐标为米（$\text{m}$），速度为米/秒（$\text{m/s}$），加速度为 $\text{m/s}^2$，角度一律采用弧度（$\text{rad}$）；
+2. **标准车辆坐标系 (ISO 8855)**：X 轴前向为正，Y 轴左侧为正，Z 轴天向为正，逆时针转动为正；
+3. **道路 Frenet 映射**：纵向沿参考线为 $s$（前进为正），横向偏离为 $l$（左正右负）；
+4. **严格接口契约**：新增规划器必须继承 `BasePlanner`，新增决策器继承 `BaseDecisionMaker`，新增控制器继承 `BaseController`。
+
+---
+
+## 五、 快速上手与运行指南
 
 ### 1. 环境准备
 建议在 Python 3.9+ 虚拟环境中运行：
@@ -100,7 +116,7 @@ python scripts/run_simulation.py --scenario highway_merge --decision game --dura
 ### 3. 运行自动化单元测试
 检验各层算法接口一致性与数值正确性：
 ```bash
-pytest tests/ -v
+python3 -m unittest discover tests/
 ```
 
 ### 4. 导出竞赛报告高清科研图表
@@ -110,7 +126,7 @@ python scripts/export_results.py
 
 ---
 
-## 五、 仿真演示与实验对比
+## 六、 仿真演示与实验对比
 
 系统在典型的高速公路匝道强交互合流工况下，对比了传统规则状态机与本系统的动态博弈决策规划算法：
 
@@ -125,12 +141,9 @@ python scripts/export_results.py
 
 ---
 
-## 六、 参考文献与标准规范
+## 七、 参考文献与标准规范
 1. **Werling, M., et al.** (2010). Optimal trajectory generation for dynamic street scenarios in a Frenet Frame. *IEEE ICRA*.
 2. **Fan, H., et al.** (2018). Baidu Apollo EM Motion Planner. *arXiv:1807.08048*.
 3. **Pacejka, H. B.** (2005). *Tire and vehicle dynamics*. Elsevier.
 4. **Krajewski, R., et al.** (2018). The highD dataset. *IEEE ITSC*.
 5. **ISO 26262 / ISO 21448 (SOTIF)** 汽车功能安全与预期功能安全国际标准规范.
-
----
-*本项目严格遵守学术诚信与竞赛规范。*
