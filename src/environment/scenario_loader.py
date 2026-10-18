@@ -225,10 +225,12 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
 
     ego_cfg = data.get("ego_initial_state", {})
     ego_speed = float(ego_cfg.get("v", ego_cfg.get("velocity", 0.0)))
+    ego_heading = float(ego_cfg.get("heading", 0.0))
+    ego_heading = math.atan2(math.sin(ego_heading), math.cos(ego_heading))
     ego_state = VehicleState(
         x=float(ego_cfg.get("x", 0.0)),
         y=float(ego_cfg.get("y", 0.0)),
-        heading=float(ego_cfg.get("heading", 0.0)),
+        heading=ego_heading,
         velocity=ego_speed,
         vx=ego_speed,
     )
@@ -239,6 +241,7 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
         state_cfg = item.get("initial_state", {})
         speed = float(state_cfg.get("v", 0.0))
         heading = float(state_cfg.get("heading", 0.0))
+        heading = math.atan2(math.sin(heading), math.cos(heading))
         obstacle = ObstacleState(
             id=str(item.get("id", f"obs_{len(manager.obstacles)}")),
             obstacle_type=_parse_obstacle_type(item.get("type", "car")),

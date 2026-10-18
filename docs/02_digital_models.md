@@ -98,7 +98,7 @@ $$U_{ego} = w_{safe} J_{safe} + w_{eff} J_{eff} + w_{comf} J_{comf}$$
 - **多目标综合代价函数**：
   $$J = w_{coll} J_{coll} + w_a \int a^2 dt + w_j \int \dot{a}^2 dt + w_v \int (v-v_{ref})^2 dt + w_{lat} \int a_{lat}^2 dt$$
   其中 $J_{coll}$ 由**按时间投影的 OBB-SAT 碰撞检测**给出，碰撞候选标记 `valid=False` 并施加 $10^6$ 量级惩罚。
-- **EM/QP**：`src/planning/em_planner.py` 目前只有 `STGraph` 与 `_optimize_path/_optimize_speed` 接口骨架，返回空轨迹；不能表述为“已实现 EM 规划器”。
+- **EM/QP**：`src/planning/em_planner.py` 目前只有 `STGraph` 与 `_optimize_path/_optimize_speed` 接口骨架，调用 `plan()` 会抛出 `NotImplementedError`；不能表述为“已实现 EM 规划器”。
 
 ---
 
@@ -121,12 +121,12 @@ $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c
 | Pacejka 非线性轮胎 | `dynamics.py::pacejka_tire_model` | ⏳ 接口预留，未进入 `step()` |
 | Frenet 双向映射 | `src/common/frenet_frame.py` | ✅ 参考线插值 + 正交投影 |
 | 五次多项式 Lattice | `src/planning/frenet_lattice.py` | ✅ 横向/纵向候选 + OBB 碰撞校验 |
-| EM / QP 规划 | `src/planning/em_planner.py` | ⏳ 接口骨架，返回空轨迹 |
+| EM / QP 规划 | `src/planning/em_planner.py` | ⏳ 接口骨架，调用抛出 `NotImplementedError` |
 | FSM 决策 | `src/decision/rule_based_fsm.py` | ✅ 巡航/跟驰/汇入/紧急停车 |
 | 博弈决策 | `src/decision/game_theoretic.py` | ✅ 2×2 收益矩阵 + 最坏情况稳健选择 |
 | LQR 横向控制 | `src/control/lqr_controller.py` | ✅ 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
 | 纵向 PID | `src/control/pid_controller.py` | ✅ 测量值微分 + 抗积分饱和 |
-| MPC | `src/control/mpc_controller.py` | ⏳ 接口骨架，返回零指令 |
+| MPC | `src/control/mpc_controller.py` | ⏳ 接口骨架，调用抛出 `NotImplementedError` |
 | IDM 跟驰 | `src/environment/obstacle_manager.py` | ✅ 背景车步进 |
 | MOBIL 换道 | `obstacle_manager.py::MOBILLaneChangeModel` | ⏳ 公式实现，未接入步进 |
 | 真实数据集加载 | `src/environment/dataset_loader.py` | ⏳ 接口骨架，未接入数据 |

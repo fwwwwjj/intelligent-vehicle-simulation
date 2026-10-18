@@ -1,6 +1,8 @@
 # 智能车辆仿真系统：全栈架构规范、变量量纲口径与 AI 协作开发指南
 ### Intelligent Vehicle Simulation System: Architecture, Conventions, and AI Collaboration Specification
 
+> **版本**：v0.2（2026-10-18）。本版同步 P0 闭环改造：真实 KPI、YAML/JSON 场景加载、Frenet Lattice 接真实参考线、时间索引 LQR、接口边界表。骨架基线为 commit `b53b9ba`，P0 实现为 commit `e701687`。
+
 > **说明文档定位**：本规范文件为本项目（中国仿真创新应用大赛参赛作品）的**单一真实数据源（Single Source of Truth, SSOT）**。旨在统一整个系统内部的所有数学物理坐标系、状态变量命名口径、量纲单位及模块间交互契约。
 > 
 > **面向对象**：后续维护本项目的开发者、评审专家，以及**接入本代码库进行迭代开发、算法补全与重构的 AI 编程助手（如 Gemini、Claude、Cursor、Copilot、ChatGPT 等）**。任何后续 AI 或工程师在修改/新增代码前，**必须严格遵循本规范中定义的命名法则与接口契约**。
@@ -24,6 +26,7 @@
 ### 1. 车辆机体坐标系 (Vehicle Coordinate System)
 - **遵循标准**：**ISO 8855 / SAE J670** 车辆动力学坐标系；
 - **原点**：车辆后轴中心点（运动学自行车模型）或车辆质心点（二自由度动力学模型）；
+- **v0.2 实现口径**：`KinematicBicycleModel` 以**后轴中心**为位姿参考点；`DynamicBicycleModel` 以**质心**为位姿参考点。`SimulationEngine` 通过 `use_dynamic_model` 切换模型时**没有做后轴/质心原点平移**，因此跨模型对比实验必须固定同一模型，或先显式做原点变换。
 - **X 轴**：沿车身纵轴指向正前方，前向为正；
 - **Y 轴**：垂直于车身纵轴指向左侧，左侧为正；
 - **Z 轴**：垂直于地面指向天空，天向为正（右手系）；
@@ -35,6 +38,7 @@
 
 ### 3. 道路参考线时空坐标系 (Frenet Frame)
 - **参考线 (Reference Line)**：光滑连续可微的二维曲线 $\mathbf{r}(s) = (x_r(s), y_r(s))$；
+- **v0.2 实现口径**：`RoadNetwork` 实际使用车道中心**折线**（默认 1 m 重采样）计算累积弧长、切向角与曲率，属于分段线性近似；`FrenetConverter.ref_point_at_s` 做线性插值。若需要解析光滑参考线，应接入样条/优化平滑器。
 - **纵向坐标 $s$ (Station)**：沿道路参考线中心线的累积曲线弧长，前进方向为正，单位 $\text{m}$；
 - **横向偏离 $l$ (Lateral Offset)**：自车位置到参考线上正交投影点（Footpoint）的有向垂直距离，**位于参考线左侧为正，右侧为负**，单位 $\text{m}$；
 - **导数严格区分**：
@@ -46,6 +50,11 @@
 ## 二、 变量命名口径与物理量纲字典 (Data Dictionary)
 
 所有类属性、函数参数、局部计算变量与持久化数据，**一律使用国际单位制 (SI Units)**。严禁在核心算法内部混合使用 $\text{km/h}$、角度制等非标准量纲（仅在可视化 HUD 文本显示时允许转换为 $\text{km/h}$）。
+
+> **接口/遥测例外（v0.2）**：
+> - 传感器配置中的 FOV 允许以度（`fov_deg`）传入，但 `SensorModel` 构造后立即转换为 `fov_rad`，核心感知逻辑只用弧度；
+> - KPI/遥测字段 `*_latency_ms` 以毫秒记录，便于工程阅读，不参与控制律计算；如需 SI，请在使用前除以 1000；
+> - 除上述两处外，核心算法、状态量与轨迹量一律使用 m / m·s⁻¹ / m·s⁻² / rad / rad·s⁻¹。
 
 ### 1. 车辆物理状态变量 (`VehicleState`)
 | 变量名 | Python 类型 | 物理量纲 (单位) | 详细物理含义与口径说明 |
@@ -73,7 +82,7 @@
 | `v` | `float` | $\text{m/s}$ | 期望瞬时线速度 |
 | `a` | `float` | $\text{m/s}^2$ | 期望切向加速度 |
 | `jerk` | `float` | $\text{m/s}^3$ | 加加速度 $\dot{a}$，用于衡量舒适性 |
-| `t` | `float` | $\text{s}$ | 规划轨迹时序相对到达时间或绝对时间戳 |
+| `t` | `float` | $\text{s}$ | 相对规划起点的到达时间；v0.2 统一使用相对时间 |
 | `s` | `float` | $\text{m}$ | 沿规划路径的累积弧长 |
 
 ### 3. Frenet 时空坐标状态变量 (`FrenetPoint`)
@@ -89,6 +98,8 @@
 | `l_prime` | `float` | 无量纲 | 横向对弧长的一阶导 $l' = dl/ds$ |
 | `l_prime_prime` | `float` | $\text{m}^{-1}$ | 横向对弧长的二阶导 $l'' = d^2l/ds^2$ |
 
+> **v0.2 实现说明**：`cartesian_to_frenet` 目前把 `l_prime_prime` 置 0，`frenet_to_cartesian` 的解析曲率因此只是近似；`FrenetLatticePlanner` 在生成离散点后会用 $\theta(s)$ 差分重新填充 `kappa/dkappa`。高精度曲率需要补全 $l''$ 解析式或改用样条。
+
 ### 4. 执行控制输出量 (`ControlCommand`)
 | 变量名 | 物理量纲 | 物理范围限制 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -96,6 +107,51 @@
 | `acceleration` | $\text{m/s}^2$ | $[-a_{decel\_max}, a_{accel\_max}]$ | 底层驱动/制动目标加速度 |
 | `throttle` | 无量纲 | $[0.0, 1.0]$ | 油门踏板开度百分比 |
 | `brake` | 无量纲 | $[0.0, 1.0]$ | 制动踏板开度百分比 |
+| `steering_rate` | $\text{rad/s}$ | 由 `max_steer_rate` 限制 | 前轮转角变化率，用于执行机构速率约束 |
+
+### 5. 障碍物状态 (`ObstacleState`)
+
+| 变量名 | 类型 | 单位 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `id` | `str` | — | 障碍物唯一标识 |
+| `obstacle_type` | `ObstacleType` | — | CAR / TRUCK / PEDESTRIAN / BICYCLE / STATIC |
+| `x`, `y` | `float` | $\text{m}$ | 几何中心全局坐标 |
+| `length`, `width` | `float` | $\text{m}$ | OBB 尺寸 |
+| `heading` | `float` | $\text{rad}$ | OBB 朝向 |
+| `vx`, `vy` | `float` | $\text{m/s}$ | 全局速度分量 |
+| `predicted_trajectory` | `Optional[List[TrajectoryPoint]]` | — | 未来预测轨迹，点 `t` 为相对预测时刻 |
+
+### 6. 参考线点 (`ReferencePoint`)
+
+| 变量名 | 类型 | 单位 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `x`, `y` | `float` | $\text{m}$ | 参考线全局坐标 |
+| `theta` | `float` | $\text{rad}$ | 切线方位角 |
+| `kappa` | `float` | $\text{m}^{-1}$ | 曲率 |
+| `dkappa` | `float` | $\text{m}^{-2}$ | 曲率对弧长的变化率 |
+| `s` | `float` | $\text{m}$ | 累积弧长 |
+
+### 7. 决策输出 (`DecisionOutput`)
+
+| 变量名 | 类型 | 单位 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `intent` | `DrivingIntent` | — | CRUISE / FOLLOW / MERGE / YIELD / EMERGENCY_STOP 等 |
+| `target_lane_id` | `str` | — | 目标车道 ID |
+| `target_speed` | `float` | $\text{m/s}$ | 期望巡航/跟驰速度 |
+| `time_headway` | `float` | $\text{s}$ | 期望车头时距 |
+| `lead_obstacle_id` | `Optional[str]` | — | 关键前导车 ID |
+| `lateral_shift_l` | `float` | $\text{m}$ | 相对目标参考线的横向偏移目标 |
+| `reasoning_log` | `str` | — | 决策解释链 |
+
+> 决策层仍**禁止**直接输出 `steering_angle`、`throttle`、`brake` 等底层执行量。
+
+### 8. 轨迹容器 (`Trajectory`)
+
+| 变量名 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `points` | `List[TrajectoryPoint]` | 按 `t` 递增排列的轨迹点 |
+| `total_cost` | `float` | 综合代价值，越小越优 |
+| `valid` | `bool` | 是否通过碰撞/动力学约束；`False` 表示无有效候选时的兜底轨迹 |
 
 ---
 
@@ -104,6 +160,8 @@
 ```mermaid
 sequenceDiagram
     autonumber
+    participant Runner as 装配层 (runner.py)
+    participant Loader as 场景加载 (scenario_loader.py)
     participant Engine as 仿真引擎 (SimulationEngine)
     participant Env as 数字环境 (ObstacleManager & RoadNetwork)
     participant Sensor as 虚拟感知 (SensorModel)
@@ -113,6 +171,10 @@ sequenceDiagram
     participant Dynamics as 车辆动力学 (VehicleModel)
     participant Metrics as 评测系统 (PerformanceEvaluator)
 
+    Runner->>Loader: load_named_scenario(name) / load_scenario(path)
+    Loader-->>Runner: Scenario(RoadNetwork, ObstacleManager, ego_state, params)
+    Runner->>Engine: 装配 Decision / Planner / Controller / 动力学模型
+
     loop 仿真步长 dt 循环 (例如 dt = 0.05s)
         Engine->>Env: step(dt) 演化动态障碍物
         Env-->>Engine: 返回全部障碍物真实物理状态
@@ -120,10 +182,10 @@ sequenceDiagram
         Sensor-->>Engine: 返回施加噪声与 FOV 截断后的感知目标
         Engine->>Decision: make_decision(ego_state, perceived_obs, lane_id)
         Decision-->>Engine: 返回决策指令 DecisionOutput (目标车道、期望巡航速度、意图)
-        Engine->>Planner: plan(ego_state, ref_line, perceived_obs, decision, horizon)
-        Planner-->>Engine: 返回无碰撞平滑时空轨迹 Trajectory
+        Engine->>Planner: plan(ego_state, ref_line, perceived_obs, decision, horizon, dt)
+        Planner-->>Engine: 返回最优 Trajectory；碰撞候选 valid=False，若无有效候选则返回最低代价轨迹
         Engine->>Control: compute_control(ego_state, planned_trajectory, dt)
-        Control-->>Engine: 返回执行指令 ControlCommand (前轮偏角, 期望加速度)
+        Control-->>Engine: 返回 ControlCommand (前轮偏角, 期望加速度, 油门/制动, 转角速率)
         Engine->>Dynamics: step(ego_state, accel_cmd, steer_cmd, dt)
         Dynamics-->>Engine: 数值微分递推得到下一时刻新 VehicleState
         Engine->>Metrics: record_step(SimulationMetricsRecord)
@@ -138,10 +200,11 @@ sequenceDiagram
 
 ### 1. `src/common/` (基础层)
 - **职责**：纯数学与纯数据类，**绝对不允许引用** `decision`、`planning`、`control` 等业务逻辑模块；
-- **契约**：所有数据类统一使用 Python `@dataclass` 装饰器，必须提供明确的默认值与清晰字段注释。
+- **契约**：纯数据容器（`VehicleState` / `TrajectoryPoint` / `FrenetPoint` / `ObstacleState` / `ReferencePoint`）统一使用 Python `@dataclass`；几何/碰撞类（`Point2D` / `BoundingBox2D`）允许使用普通类，但字段、单位与构造参数必须有清晰注释。
 
 ### 2. `src/environment/` (环境层)
-- **职责**：管理道路几何拓扑（`RoadNetwork`）、真实交通数据集解析（`BaseDatasetLoader`）与多车动态微观跟驰换道演化（`ObstacleManager`）；
+- **职责**：管理道路几何拓扑（`RoadNetwork`）、场景装载（`scenario_loader.py`）、真实交通数据集解析（`BaseDatasetLoader`）与多车动态微观演化（`ObstacleManager`）；
+- **当前实现**：IDM 跟驰已进入 `ObstacleManager.step()`；MOBIL 换道判定公式已保留，但尚未接入换道状态机；真实数据集 loader 仅有接口骨架。
 - **扩展规范**：若新增数据集解析器（如 Waymo 或 nuScenes），必须继承 `BaseDatasetLoader` 并实现 `load_scenario()` 与 `get_frame_obstacles()`。
 
 ### 3. `src/vehicle_model/` (物理机理层)
@@ -150,18 +213,25 @@ sequenceDiagram
 
 ### 4. `src/decision/` (行为决策层)
 - **职责**：宏观战略意图判定，输出高层指令 `DecisionOutput`；
-- **禁止项**：决策层**禁止直接输出底层转向角或方向盘扭矩**，其输出只能包括 `intent`（巡航、跟驰、换道、停车）、`target_lane_id`、`target_speed` 与安全走廊边界约束。
+- **禁止项**：决策层**禁止直接输出底层转向角、油门/制动或方向盘扭矩**；
+- **允许输出**：`intent`（巡航、跟驰、换道、停车等）、`target_lane_id`、`target_speed`、`time_headway`、`lead_obstacle_id`、`lateral_shift_l` 与 `reasoning_log`。
 
 ### 5. `src/planning/` (局部轨迹规划层)
 - **职责**：在决策约束与参考线指引下，解算连续平滑时空轨迹；
 - **输入输出契约**：
   - 输入：`ego_state`, `reference_line`, `obstacles`, `decision`, `horizon`, `dt`；
   - 输出：`Trajectory`（由若干按时间递增排列的 `TrajectoryPoint` 组成）；
-- **平滑性要求**：所生成的轨迹必须保证曲率 $\kappa$ 连续，加速度 $a$ 在物理极限以内。
+- **平滑性要求（验收目标）**：轨迹应尽量保证曲率 $\kappa$ 连续、加速度 $a$ 在物理极限以内；
+- **v0.2 实现**：`FrenetLatticePlanner` 用五次多项式生成候选，`kappa/dkappa` 由离散 $\theta(s)$ 差分计算；通过横向加速度代价、加速度越界 `valid=False` 与 OBB 碰撞校验进行约束，属于**软约束 + 候选筛选**，不是数学上的硬保证。若无任何无碰撞候选，返回综合代价最低的轨迹并置 `valid=False`，控制器仍会执行制动/跟踪。
 
 ### 6. `src/control/` (运动控制层)
 - **职责**：跟踪规划轨迹，抑制扰动；
-- **输入输出契约**：根据当前 `VehicleState` 与 `Trajectory`，计算出 `ControlCommand`（转向角、油门/刹车或加速度）。
+- **输入输出契约**：根据当前 `VehicleState` 与 `Trajectory`，计算出 `ControlCommand`（转向角、期望加速度、油门/制动开度、转角速率）。
+- **当前实现**：`LQRController` 使用时间索引预瞄 + 曲率前馈 + 横向加速度/转角速率限制；纵向复用 `LongitudinalPIDController`，并对目标速度做一阶低通、对加速度做 jerk 限制。`MPCController` 仍为接口骨架。
+
+### 7. `src/runner.py` (装配层)
+- **职责**：把 `Scenario` 装配为 `SimulationEngine`，统一读取车辆参数、传感器参数、决策器/规划器/控制器；
+- **禁止项**：装配层不得包含决策、规划或控制算法逻辑，也不得硬编码与场景 YAML 不一致的世界参数。
 
 ---
 
@@ -173,9 +243,11 @@ sequenceDiagram
 ### AI 辅助开发准则：
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
-3. 【坐标变换】：任何从笛卡尔坐标系到道路参考线的映射，必须统一调用 src.common.frenet_frame.FrenetConverter，严禁在各算法内部私自重复编写易出错的坐标旋转方程。
+3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
 4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 15 项）。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
+6. 【未实现接口必须显式失败】：EM/QP、MPC 等尚未实现的算法，调用入口必须抛出 NotImplementedError，禁止返回空 Trajectory / 零控制量冒充有效输出。
+7. 【结果由脚本生成】：KPI 表、曲线与对比数字必须由 scripts/ 下的运行/评测脚本生成；单 seed 结果必须标注，禁止手填或复制旧文档数字。
 ```
 
 
@@ -191,7 +263,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；内置 `highway_merge`、`emergency_avoidance` |
 | 道路参考线 | `src/environment/road_network.py` | 生成真实 `s/theta/kappa`，按位置查车道 |
-| Frenet 映射 | `src/common/frenet_frame.py` | 正交投影 + `ref_point_at_s` 插值 |
+| Frenet 映射 | `src/common/frenet_frame.py` | 正交投影 + `ref_point_at_s` 插值；`l_prime_prime` 暂置 0，规划器数值重算曲率 |
 | 轨迹规划 | `src/planning/frenet_lattice.py` | 五次多项式 + 时间投影 OBB 碰撞校验 + 曲率/jerk 填充 |
 | 行为决策 | `src/decision/rule_based_fsm.py` / `game_theoretic.py` | 跟驰、汇入、紧急停车；2×2 收益矩阵 |
 | 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
@@ -205,8 +277,8 @@ sequenceDiagram
 | 功能 | 现状 | 禁止表述 |
 | :--- | :--- | :--- |
 | highD / INTERACTION / NGSIM | `dataset_loader.py` 返回元数据或空列表，无数据文件 | “已用真实数据标定” |
-| EM / QP 规划 | `em_planner.py` 返回空 `Trajectory` | “已实现 EM 规划器” |
-| MPC | `mpc_controller.py` 返回零指令 | “已实现 MPC 跟踪” |
+| EM / QP 规划 | `em_planner.py::plan` 抛出 `NotImplementedError` | “已实现 EM 规划器” |
+| MPC | `mpc_controller.py::compute_control` 抛出 `NotImplementedError` | “已实现 MPC 跟踪” |
 | Pacejka 轮胎 | `pacejka_tire_model()` 未被 `step()` 调用 | “已采用 Pacejka 非线性轮胎” |
 | MOBIL | 公式类存在，未进入 `ObstacleManager.step()` | “已实现 MOBIL 换道” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |

@@ -43,7 +43,7 @@ class RoadNetwork:
     # ------------------------------------------------------------------
     # 参考线生成
     # ------------------------------------------------------------------
-    def generate_reference_line(self, lane_id: str, sample_step: float = 0.5) -> List[ReferencePoint]:
+    def generate_reference_line(self, lane_id: str, sample_step: float = 1.0) -> List[ReferencePoint]:
         """
         基于车道中心几何离散点生成带 (x, y, theta, kappa, dkappa, s) 的参考线。
 
