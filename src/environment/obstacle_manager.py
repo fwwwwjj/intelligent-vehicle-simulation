@@ -3,7 +3,7 @@
 支持微观交通流行为演化模型：
 1. 智能驾驶员纵向跟驰模型 (IDM, Intelligent Driver Model) —— 已接入 step()；
 2. 协同换道模型 (MOBIL, Minimizing Overall Braking Induced by Lane change) ——
-   仅保留判定公式，尚未接入换道状态机。
+   可选状态机，场景可控制是否启用。
 
 当前 ``step()`` 对注册了 IDM 的车辆做跟驰更新，其余车辆保持匀速。预测轨迹使用
 最近一次计算的纵向加速度作恒加速度外推，并在预测速度到零时截断位置。
@@ -94,12 +94,28 @@ class ObstacleManager:
         self.enable_mobil: bool = enable_mobil
         self.lane_width: float = lane_width
         self._lane_change_states: Dict[str, Dict[str, Any]] = {}
+        self._scheduled_lane_changes: Dict[str, Dict[str, float]] = {}
+        self.current_time: float = 0.0
 
     def add_obstacle(self, obstacle: ObstacleState, idm: Optional[IntelligentDriverModel] = None) -> None:
         """注册障碍物"""
         self.obstacles[obstacle.id] = obstacle
         if idm is not None:
             self.idm_models[obstacle.id] = idm
+
+    def schedule_lane_change(
+        self, obstacle_id: str, target_y: float, start_time: float, duration: float
+    ) -> None:
+        """Schedule a smooth, deterministic lateral maneuver for a scripted scenario."""
+        if obstacle_id not in self.obstacles:
+            raise KeyError(f"Unknown obstacle: {obstacle_id}")
+        if duration <= 0.0 or start_time < 0.0:
+            raise ValueError("start_time must be nonnegative and duration must be positive")
+        self._scheduled_lane_changes[obstacle_id] = {
+            "target_y": float(target_y),
+            "start_time": float(start_time),
+            "duration": float(duration),
+        }
 
     def _find_lead_at_y(self, obstacle: ObstacleState, check_y: float) -> Optional[ObstacleState]:
         """在指定横向车道线正前方寻找最近前车。"""
@@ -275,7 +291,7 @@ class ObstacleManager:
         # 2. MOBIL 换道状态机更新
         if self.enable_mobil:
             for obs_id, obs in self.obstacles.items():
-                if obs_id in self._lane_change_states:
+                if obs_id in self._lane_change_states or obs_id in self._scheduled_lane_changes:
                     continue
                 accel = accelerations.get(obs_id, 0.0)
                 target_y = self._evaluate_mobil_lane_change(obs_id, obs, accel)
@@ -286,6 +302,19 @@ class ObstacleManager:
                         "duration": 2.5,
                         "elapsed": 0.0,
                     }
+
+        # Deterministic scenario maneuvers are independent of the MOBIL toggle.
+        for obs_id, schedule in list(self._scheduled_lane_changes.items()):
+            if obs_id in self._lane_change_states or self.current_time + 1e-12 < schedule["start_time"]:
+                continue
+            obs = self.obstacles[obs_id]
+            self._lane_change_states[obs_id] = {
+                "target_y": schedule["target_y"],
+                "start_y": obs.y,
+                "duration": schedule["duration"],
+                "elapsed": 0.0,
+            }
+            del self._scheduled_lane_changes[obs_id]
 
         # 3. 积分位姿与横向状态
         for obs_id, obs in self.obstacles.items():
@@ -315,6 +344,8 @@ class ObstacleManager:
             obs.x += obs.vx * dt
 
             self.generate_predicted_trajectory(obs_id, horizon=6.0, dt=0.2)
+
+        self.current_time += dt
 
     def generate_predicted_trajectory(self, obstacle_id: str, horizon: float = 5.0, dt: float = 0.2) -> List[TrajectoryPoint]:
         """

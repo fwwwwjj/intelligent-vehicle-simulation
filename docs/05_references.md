@@ -18,7 +18,7 @@ intelligent-vehicle-simulation/
 │   └── 05_references.md        # 权威学术参考文献与国际行业标准规范
 ├── src/                        # 核心仿真引擎与高保真算法接口实现
 │   ├── common/                 # 车辆状态、Frenet双向映射、OBB几何碰撞检测
-│   ├── environment/            # 道路网络、场景加载、IDM 跟驰、highD CSV 解析；MOBIL/INTERACTION 预留
+│   ├── environment/            # 道路网络、场景加载、IDM/MOBIL 交通演化、highD CSV 解析；INTERACTION 预留
 │   │   ├── road_network.py     # 车道拓扑与真实 s/theta/kappa 参考线
 │   │   ├── scenario_loader.py  # YAML/JSON 场景 -> 路网/障碍物/自车
 │   │   ├── obstacle_manager.py # IDM 步进与预测轨迹
@@ -48,13 +48,13 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 当前 30 项测试
+# 测试数量以本地运行输出为准
 python3 -m unittest discover tests -v
 
 # 闭环仿真 + KPI
 python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
 
-# 批量评测（结果写入 results/benchmark.json / csv）
+# 批量评测（逐次结果写入 JSON/CSV，分组统计另写 benchmark_summary.csv）
 python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance \
   --decisions fsm game --seeds 42 --duration 20
 ```

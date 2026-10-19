@@ -1,5 +1,16 @@
 # AI 修改记录
 
+## 2026-10-19
+
+- **修改文件**：`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/evaluation/benchmark.py`、`scripts/run_benchmark.py`、`configs/scenarios/highway_merge.yaml`、`configs/scenarios/cut_in.yaml`、`tests/test_closed_loop.py`、`tests/test_obstacle_manager.py`、`tests/test_metrics.py`、`AI_SYSTEM_SPEC.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG_AI.md`
+- **修改内容**：
+  1. 增加场景级 `traffic.enable_mobil` / `lane_width` 配置；`highway_merge` 显式启用 MOBIL，其他场景维持按配置关闭；内置场景与 YAML 行为保持同步。
+  2. 增加障碍物脚本化平滑换道调度；`cut_in` 车辆按配置的目标车道、开始时刻和持续时间切入，行为由闭环测试验证。
+  3. 基准 JSON 增加执行参数、Python 版本、Git 提交号、场景配置 SHA-256 指纹、逐次原始结果和分组统计；新增原始运行 CSV 与分组汇总 CSV。批量成功率由每次运行 0/1 结果求均值，并提供 Wilson 95% 区间；连续指标报告均值及样本标准差。
+  4. 更新 SSOT、README 和技术支撑文档，删除过时/无依据的实现状态和实验数字。
+- **验证方式及结果**：GPT-6 Luna 运行 `python3 -m unittest discover tests -v`，39 项全部通过（3.134 秒）；`git diff --check` 通过。执行三场景（`highway_merge`、`emergency_avoidance`、`cut_in`）× FSM/Game × seeds 42/43/44、每次 3.5 s 的轻量 benchmark，18 次运行完成，生成 `results/benchmark.json`、`results/benchmark.csv`、`results/benchmark_summary.csv`。该短时合成场景运行仅用于验证场景和统计管线，不作为性能结论。
+- **未完成/边界**：没有接入真实 highD 原始数据；短时、每组 3 个 seed 的 smoke benchmark 不足以支持泛化或竞赛统计结论；MPC、EM/QP 与 Pacejka 主回路仍未实现。本次未提交或推送。
+
 ## 2026-10-19 21:26:00
 
 - **修改文件**：`test`（删除）、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/environment/calibration.py`（新增）、`src/environment/__init__.py`、`scripts/generate_sample_highd.py`（新增）、`configs/scenarios/cut_in.yaml`（新增）、`tests/test_calibration.py`（新增）、`tests/test_obstacle_manager.py`、`tests/test_closed_loop.py`、`tests/test_dataset_loader.py`、`data/README.md`、`docs/01_problem_and_data.md`、`docs/02_digital_models.md`、`AI_SYSTEM_SPEC.md`、`README.md`、`CHANGELOG_AI.md`

@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--decisions", nargs="+", default=["fsm", "game"], choices=["fsm", "game"])
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
     parser.add_argument("--duration", type=float, default=20.0)
+    parser.add_argument("--output-dir", default="results", help="结果输出目录")
+    parser.add_argument("--dynamic-model", action="store_true", help="使用 2-DOF 动力学模型")
     args = parser.parse_args()
 
     print(">>> 启动批量场景基准评测...")
@@ -27,9 +29,10 @@ def main():
         decisions=args.decisions,
         seeds=args.seeds,
         duration=args.duration,
+        use_dynamic_model=args.dynamic_model,
     )
     results = suite.run_all()
-    json_path, csv_path = suite.save("results")
+    json_path, csv_path, summary_csv_path = suite.save(args.output_dir)
 
     print("\n---------------- Benchmark Summary ----------------")
     header = f"{'key':40s} {'success':>7s} {'minD(m)':>8s} {'TTC(s)':>8s} {'RMSjerk':>8s} {'latErr':>7s} {'plan(ms)':>9s}"
@@ -44,8 +47,16 @@ def main():
             f"{row.get('avg_planning_latency_ms', 0):9.2f}"
         )
     print("--------------------------------------------------")
+    print("Group summary (per-run success rate, Wilson 95% CI):")
+    for row in suite.group_summary:
+        print(
+            f"{row['scenario']} / {row['decision']}: n={row['sample_count']}, "
+            f"success={row['success_rate_mean']:.3f} "
+            f"[{row['success_rate_ci95_low']:.3f}, {row['success_rate_ci95_high']:.3f}]"
+        )
     print(f">>> JSON: {json_path}")
     print(f">>> CSV : {csv_path}")
+    print(f">>> Group summary CSV: {summary_csv_path}")
 
 
 if __name__ == "__main__":

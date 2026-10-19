@@ -7,10 +7,14 @@ KPI 聚合口径测试。
 """
 
 import unittest
+import csv
+import json
+import tempfile
 
 import numpy as np
 
 from src.evaluation.metrics import PerformanceEvaluator, SimulationMetricsRecord
+from src.evaluation.benchmark import BenchmarkSuite
 
 
 def _record(
@@ -93,6 +97,43 @@ class TestPerformanceEvaluator(unittest.TestCase):
         evaluator.reset()
         self.assertEqual(evaluator.records, [])
         self.assertEqual(evaluator.compute_summary_report(), {})
+
+
+class TestBenchmarkSummary(unittest.TestCase):
+    def test_group_summary_reports_sample_spread_and_success_interval(self):
+        suite = BenchmarkSuite(["merge"], decisions=["fsm"], seeds=[1, 2, 3])
+        suite.results = {
+            "a": {"scenario": "merge", "decision": "fsm", "seed": 1, "success_rate": 1.0, "collision_count": 0.0, "mean_lateral_error_m": 1.0},
+            "b": {"scenario": "merge", "decision": "fsm", "seed": 2, "success_rate": 0.0, "collision_count": 1.0, "mean_lateral_error_m": 3.0},
+            "c": {"scenario": "merge", "decision": "fsm", "seed": 3, "success_rate": 1.0, "collision_count": 0.0, "mean_lateral_error_m": 2.0},
+        }
+        summary = suite.summarize_groups()[0]
+        self.assertEqual(summary["sample_count"], 3)
+        self.assertEqual(summary["success_count"], 2)
+        self.assertAlmostEqual(summary["success_rate_mean"], 2.0 / 3.0)
+        self.assertLess(summary["success_rate_ci95_low"], 2.0 / 3.0)
+        self.assertGreater(summary["success_rate_ci95_high"], 2.0 / 3.0)
+        self.assertAlmostEqual(summary["mean_lateral_error_m_mean"], 2.0)
+        self.assertAlmostEqual(summary["mean_lateral_error_m_std"], 1.0)
+
+    def test_save_writes_raw_runs_and_group_summary(self):
+        suite = BenchmarkSuite(["merge"], decisions=["fsm"], seeds=[42], duration=2.0)
+        suite.results = {
+            "merge__fsm__seed42": {
+                "scenario": "merge", "decision": "fsm", "seed": 42,
+                "success_rate": 1.0, "mean_lateral_error_m": 0.1,
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            json_path, raw_csv, summary_csv = suite.save(directory)
+            with open(json_path, encoding="utf-8") as fh:
+                payload = json.load(fh)
+            self.assertIn("merge__fsm__seed42", payload["runs"])
+            self.assertEqual(payload["metadata"]["seeds"], [42])
+            with open(raw_csv, encoding="utf-8", newline="") as fh:
+                self.assertEqual(len(list(csv.DictReader(fh))), 1)
+            with open(summary_csv, encoding="utf-8", newline="") as fh:
+                self.assertEqual(len(list(csv.DictReader(fh))), 1)
 
 
 if __name__ == "__main__":

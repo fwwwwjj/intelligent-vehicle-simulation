@@ -9,7 +9,7 @@ flowchart TD
     subgraph Env["数字环境与数据源层"]
         D1["真实数据集接口（未接入）"]
         D2["数字路网（项目 YAML 场景）"]
-        D3["交通流演化（IDM 已接入 / MOBIL 预留）"]
+        D3["交通流演化（IDM / 可配置 MOBIL）"]
     end
 
     subgraph Sense["虚拟感知数字模型"]
@@ -107,7 +107,7 @@ $$U_{ego} = w_{safe} J_{safe} + w_{eff} J_{eff} + w_{comf} J_{comf}$$
 $$P = A_d^T P A_d - (A_d^T P B_d)(R + B_d^T P B_d)^{-1}(B_d^T P A_d) + Q$$
 最优控制律叠加曲率前馈补偿项：
 $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c_f} - \frac{l_f}{c_r}\right)\right)$$
-目标是在弯道与换道过程中将横向跟踪偏差控制在 10 cm 量级；当前 `highway_merge` 实测平均横向误差约 0.003 m，但该结果只来自单一合成场景，不能外推为全工况保证。
+跟踪效果需通过当前基准脚本在指定场景、seed 和模型配置下生成并报告；不得沿用缺少可追溯原始输出的历史误差数字，也不能将合成场景结果外推为全工况保证。
 
 
 ---
@@ -128,6 +128,6 @@ $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c
 | 纵向 PID | `src/control/pid_controller.py` | ✅ 测量值微分 + 抗积分饱和 |
 | MPC | `src/control/mpc_controller.py` | ⏳ 接口骨架，调用抛出 `NotImplementedError` |
 | IDM 跟驰与加速度外推 | `src/environment/obstacle_manager.py` | ✅ 背景车步进；预测使用最近一次 IDM 纵向加速度，制动至零速后停止外推 |
-| MOBIL 换道 | `obstacle_manager.py::ObstacleManager` | ✅ 接入换道状态机，支持多车道平滑三次多项式换道过渡 |
+| MOBIL 换道 | `obstacle_manager.py::ObstacleManager` | ✅ 场景 `traffic.enable_mobil` 可控，支持平滑三次多项式换道过渡；独立脚本化切入行为可按场景时间配置 |
 | 真实数据集加载 | `src/environment/dataset_loader.py` | ✅ highD 格式 CSV 解析；配套生成微型样例 `scripts/generate_sample_highd.py` |
 | 参数标定工具链 | `src/environment/calibration.py` | ✅ 基于最小二乘优化的 IDM 跟驰参数辨识工具链 |

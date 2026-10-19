@@ -10,6 +10,10 @@ map:
   lane_width: 3.75
   speed_limit: 22.22
 
+traffic:
+  enable_mobil: false
+  lane_width: 3.75
+
 ego_initial_state:
   x: 0.0
   y: 0.0                       # 主车位于 main_lane_0
@@ -20,8 +24,9 @@ ego_initial_state:
 obstacles:
   - id: "obs_cut_in"
     type: "car"
-    initial_state: {x: 25.0, y: 3.75, v: 16.0, heading: -0.06, lane_id: "main_lane_1"}
-    behavior_type: "constant_speed"
+    initial_state: {x: 25.0, y: 3.75, v: 16.0, heading: 0.0, lane_id: "main_lane_1"}
+    behavior_type: "scripted_lane_change"
+    lane_change: {target_lane_id: "main_lane_0", start_time: 0.5, duration: 2.5}
   - id: "obs_lead_far"
     type: "car"
     initial_state: {x: 80.0, y: 0.0, v: 22.0, heading: 0.0, lane_id: "main_lane_0"}

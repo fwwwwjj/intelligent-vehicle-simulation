@@ -20,6 +20,21 @@ def _car(obstacle_id: str, x: float, speed: float) -> ObstacleState:
 
 
 class TestObstaclePrediction(unittest.TestCase):
+    def test_scheduled_lane_change_starts_at_configured_time(self):
+        manager = ObstacleManager()
+        car = _car("scripted", 0.0, 10.0)
+        car.y = 3.75
+        manager.add_obstacle(car)
+        manager.schedule_lane_change("scripted", target_y=0.0, start_time=0.5, duration=1.0)
+
+        for _ in range(5):
+            manager.step(0.1)
+        self.assertAlmostEqual(car.y, 3.75)
+        for _ in range(10):
+            manager.step(0.1)
+        self.assertAlmostEqual(car.y, 0.0, places=6)
+        self.assertAlmostEqual(car.vy, 0.0, places=6)
+
     def test_idm_acceleration_is_used_in_prediction(self):
         manager = ObstacleManager()
         car = _car("idm", 0.0, 10.0)

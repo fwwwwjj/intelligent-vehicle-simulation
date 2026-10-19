@@ -6,7 +6,7 @@
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![Build Status](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 
-> 本项目为**中国仿真创新应用大赛**参赛项目研发框架。针对智能车辆在复杂高动态、强交互道路场景下的行为决策与轨迹规划难题，当前版本已构建涵盖**数字道路环境**、**虚拟感知模型**、**规则/博弈分层决策**、**Frenet Lattice 轨迹规划**、**LQR + PID 跟踪控制**及**真实 KPI 量化评估**的闭环仿真基线。EM/QP、MPC、MOBIL 换道与 highD 数据标定是后续迭代项，当前实现边界见文末。
+> 本项目为**中国仿真创新应用大赛**参赛项目研发框架。针对智能车辆在复杂高动态、强交互道路场景下的行为决策与轨迹规划难题，当前版本已构建涵盖**数字道路环境**、**虚拟感知模型**、**规则/博弈分层决策**、**Frenet Lattice 轨迹规划**、**LQR + PID 跟踪控制**及**KPI 量化评估**的闭环仿真基线。EM/QP、MPC 和 Pacejka 闭环仍未完成；真实 highD 数据未随仓库提供，当前实现边界见文末。
 
 > 📖 **开发者与 AI 协作规范指南**：本项目提供完备的系统开发与变量口径说明书，请直接参阅 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)。后续人类工程师或 AI 编码工具在进行算法修改、代码生成与扩展时，请严格以该文件作为单一真实数据源（SSOT）。
 
@@ -70,7 +70,7 @@ intelligent-vehicle-simulation/
 ├── docs/                       # 比赛申报规范技术报告 (5大核心章节)
 ├── src/                        # 核心仿真引擎与算法接口
 │   ├── common/                 # 车辆状态、Frenet双向映射、OBB包围盒 SAT 碰撞检测
-│   ├── environment/            # 道路网络、场景加载、IDM 跟驰、highD CSV 解析；MOBIL/INTERACTION 为接口预留
+│   ├── environment/            # 道路网络、场景加载、IDM/MOBIL 交通演化、highD CSV 解析
 │   ├── vehicle_model/          # 运动学、2-DOF 动力学与传感器模型；Pacejka 为接口预留
 │   ├── decision/               # 分层有限状态机 (HFSM) 与博弈交互决策器接口
 │   ├── planning/               # Frenet Lattice 采样 + 碰撞校验；EM/QP 为接口预留
@@ -126,7 +126,7 @@ python3 scripts/run_simulation.py --scenario highway_merge --decision game --dur
 python3 -m unittest discover tests -v
 ```
 
-当前共 35 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、微型切片生成、seed 复现、闭环速度跟踪、IDM 障碍物预测、MOBIL 换道状态机及 IDM 参数辨识。
+测试覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、微型切片生成、seed 复现、闭环速度跟踪、IDM 障碍物预测、MOBIL/脚本换道、批量评测统计及 IDM 参数辨识。具体测试数量以 `python3 -m unittest discover tests -v` 的实际输出为准。
 
 > 开发期建议只跑上述单元测试（约 2.5 s）。多 seed `run_benchmark.py`、可视化渲染与图表导出会持续占用 CPU，建议在空闲时段单独运行，避免与日常编码并行导致机器过热。
 
@@ -139,7 +139,7 @@ python3 scripts/export_results.py --scenario highway_merge --decision fsm --dura
 
 ## 六、 仿真演示与实验对比
 
-当前仓库没有随附 `results/benchmark.json` / `results/benchmark.csv` 原始输出，因此旧版列出的具体数值无法在此检出版本中追溯，本版不保留这些实验数字。可用以下命令重新生成本地结果；单 seed 只用于冒烟验证，不代表统计显著性：
+当前仓库没有随附基准结果文件，因此不在此列出不可追溯的具体实验数字。可用以下命令重新生成本地结果；单 seed 只用于冒烟验证，不代表统计显著性。脚本会输出逐次原始结果和按场景/决策器分组的统计：
 
 ```bash
 python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance cut_in --decisions fsm game --seeds 42 --duration 20
@@ -152,7 +152,7 @@ python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance c
 **已实现并进入闭环：**
 - `RoadNetwork` 直线多车道参考线（真实 s / theta / kappa）、按位置查车道；
 - Frenet 双向映射、五次多项式 Lattice、按时间投影障碍物的 OBB 碰撞校验；
-- IDM 跟驰步进与 MOBIL 协同换道状态机（三次多项式平滑横向过渡）；
+- IDM 跟驰步进与可由场景配置启用的 MOBIL 协同换道状态机（三次多项式平滑横向过渡）；`cut_in` 使用配置触发的定时平滑横向切入；
 - FSM 与收益矩阵博弈决策、LQR 横向跟踪 + 纵向 PID；
 - 真实 KPI：OBB 碰撞、最小净距、TTC、横向/航向误差、Δa/Δt jerk、规划/决策/控制时延；
 - `highway_merge`、`emergency_avoidance`、`cut_in` 三个内置场景、YAML/JSON 场景加载、seed 复现；

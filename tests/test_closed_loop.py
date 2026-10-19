@@ -200,11 +200,23 @@ class TestClosedLoop(unittest.TestCase):
     def test_named_cut_in_scenario_loads_and_runs(self):
         scenario = load_named_scenario("cut_in")
         self.assertEqual(scenario.name, "cut_in")
+        obstacle = scenario.obstacle_manager.obstacles["obs_cut_in"]
+        initial_y = obstacle.y
+        for _ in range(70):
+            scenario.obstacle_manager.step(scenario.dt)
+        self.assertLess(obstacle.y, initial_y - 2.0)
+        self.assertAlmostEqual(obstacle.y, 0.0, delta=0.5)
+
+        scenario = load_named_scenario("cut_in")
         engine = build_engine(scenario, decision="fsm", enable_visualization=False)
         for _ in range(20):
             engine.step()
         self.assertGreater(engine.ego_state.x, 0.0)
         self.assertEqual(len(engine.evaluator.records), 20)
+
+    def test_yaml_scenario_can_enable_mobil(self):
+        scenario = load_named_scenario("highway_merge")
+        self.assertTrue(scenario.obstacle_manager.enable_mobil)
 
 
 if __name__ == "__main__":

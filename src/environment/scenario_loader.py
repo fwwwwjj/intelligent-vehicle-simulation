@@ -98,6 +98,7 @@ HIGHWAY_MERGE_DICT: Dict[str, Any] = {
             "behavior_type": "constant_speed",
         },
     ],
+    "traffic": {"enable_mobil": True, "lane_width": 3.75},
 }
 
 
@@ -146,8 +147,9 @@ CUT_IN_DICT: Dict[str, Any] = {
         {
             "id": "obs_cut_in",
             "type": "car",
-            "initial_state": {"x": 25.0, "y": 3.75, "v": 16.0, "heading": -0.06, "lane_id": "main_lane_1"},
-            "behavior_type": "constant_speed",
+            "initial_state": {"x": 25.0, "y": 3.75, "v": 16.0, "heading": 0.0, "lane_id": "main_lane_1"},
+            "behavior_type": "scripted_lane_change",
+            "lane_change": {"target_y": 0.0, "start_time": 0.5, "duration": 2.5},
         },
         {
             "id": "obs_lead_far",
@@ -156,6 +158,7 @@ CUT_IN_DICT: Dict[str, Any] = {
             "behavior_type": "constant_speed",
         },
     ],
+    "traffic": {"enable_mobil": False, "lane_width": 3.75},
 }
 
 
@@ -280,7 +283,12 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
     )
     current_lane_id = str(ego_cfg.get("lane_id", "main_lane_0"))
 
-    manager = ObstacleManager()
+    traffic_cfg = data.get("traffic", {})
+    lane_width = float(data.get("map", {}).get("lane_width", config["environment"]["lane_width"]))
+    manager = ObstacleManager(
+        enable_mobil=bool(traffic_cfg.get("enable_mobil", False)),
+        lane_width=float(traffic_cfg.get("lane_width", lane_width)),
+    )
     for item in data.get("obstacles", []):
         state_cfg = item.get("initial_state", {})
         speed = float(state_cfg.get("v", 0.0))
@@ -308,6 +316,20 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
                 b_desired=float(idm_cfg.get("b_desired", 2.5)),
             )
         manager.add_obstacle(obstacle, idm)
+        if str(item.get("behavior_type", "")).lower() == "scripted_lane_change":
+            maneuver = item.get("lane_change", {})
+            target_lane = maneuver.get("target_lane_id")
+            target_y = maneuver.get("target_y")
+            if target_y is None and target_lane in road.lanes:
+                target_y = road.get_lane_center_y(target_lane)
+            if target_y is None:
+                raise ValueError(f"Obstacle {obstacle.id} scripted lane change needs target_y or valid target_lane_id")
+            manager.schedule_lane_change(
+                obstacle.id,
+                target_y=float(target_y),
+                start_time=float(maneuver.get("start_time", 0.0)),
+                duration=float(maneuver.get("duration", 2.5)),
+            )
         manager.generate_predicted_trajectory(obstacle.id, horizon=6.0, dt=0.2)
 
     sim_cfg = config.get("simulation", {})

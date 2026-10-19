@@ -10,6 +10,10 @@ map:
   lane_width: 3.75
   speed_limit: 22.22
 
+traffic:
+  enable_mobil: true
+  lane_width: 3.75
+
 ego_initial_state:
   x: 0.0
   y: -3.75                     # 匝道位于主线右侧
