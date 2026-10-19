@@ -126,9 +126,9 @@ python3 scripts/run_simulation.py --scenario highway_merge --decision game --dur
 python3 -m unittest discover tests -v
 ```
 
-当前共 30 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、seed 复现、闭环速度跟踪及 IDM 障碍物预测。
+当前共 35 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、微型切片生成、seed 复现、闭环速度跟踪、IDM 障碍物预测、MOBIL 换道状态机及 IDM 参数辨识。
 
-> 开发期建议只跑上述单元测试（约 3 s）。多 seed `run_benchmark.py`、可视化渲染与图表导出会持续占用 CPU，建议在空闲时段单独运行，避免与日常编码并行导致机器过热。
+> 开发期建议只跑上述单元测试（约 2.5 s）。多 seed `run_benchmark.py`、可视化渲染与图表导出会持续占用 CPU，建议在空闲时段单独运行，避免与日常编码并行导致机器过热。
 
 ### 4. 导出竞赛报告高清科研图表
 ```bash
@@ -142,7 +142,7 @@ python3 scripts/export_results.py --scenario highway_merge --decision fsm --dura
 当前仓库没有随附 `results/benchmark.json` / `results/benchmark.csv` 原始输出，因此旧版列出的具体数值无法在此检出版本中追溯，本版不保留这些实验数字。可用以下命令重新生成本地结果；单 seed 只用于冒烟验证，不代表统计显著性：
 
 ```bash
-python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance --decisions fsm game --seeds 42 --duration 20
+python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance cut_in --decisions fsm game --seeds 42 --duration 20
 ```
 
 ---
@@ -152,14 +152,17 @@ python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance -
 **已实现并进入闭环：**
 - `RoadNetwork` 直线多车道参考线（真实 s / theta / kappa）、按位置查车道；
 - Frenet 双向映射、五次多项式 Lattice、按时间投影障碍物的 OBB 碰撞校验；
-- IDM 跟驰步进、FSM 与收益矩阵博弈决策、LQR 横向跟踪 + 纵向 PID；
+- IDM 跟驰步进与 MOBIL 协同换道状态机（三次多项式平滑横向过渡）；
+- FSM 与收益矩阵博弈决策、LQR 横向跟踪 + 纵向 PID；
 - 真实 KPI：OBB 碰撞、最小净距、TTC、横向/航向误差、Δa/Δt jerk、规划/决策/控制时延；
-- `highway_merge` 与 `emergency_avoidance` 两个内置场景、YAML/JSON 场景加载、seed 复现。
+- `highway_merge`、`emergency_avoidance`、`cut_in` 三个内置场景、YAML/JSON 场景加载、seed 复现；
+- 微型 highD 演示数据生成脚本（`scripts/generate_sample_highd.py`）与系统辨识参数标定工具链（`src/environment/calibration.py`）。
 
 **接口预留 / 尚未完成：**
-- highD 真实数据标定与 INTERACTION/NGSIM 接入（highD 格式 CSV 解析器已实现，但仓库未附带数据、尚未标定；INTERACTION/NGSIM 仍为接口）；
-- MOBIL 换道模型、EM/QP 速度剖面、MPC、Pacejka 非线性轮胎进入主回路；
-- 城市无保护路口、真实 cut-in 场景、OpenSCENARIO / ROS / CARLA 联合仿真；
+- INTERACTION / NGSIM 数据集接入（仍为接口预留）；
+- 全量实测数据生产环境标定（已提供辨识工具链与微型切片，未附带数十 GB 原始全量数据）；
+- EM/QP 速度剖面优化、MPC 控制器、Pacejka 非线性轮胎进入主回路；
+- 城市无保护路口、OpenSCENARIO / ROS / CARLA 联合仿真；
 - 大规模多 seed 统计与置信区间。
 
 这些边界会在 `docs/03_results_and_demo.md` 与 `AI_SYSTEM_SPEC.md` 中同步说明。评审材料中不应把“接口预留”写成“已完成”。

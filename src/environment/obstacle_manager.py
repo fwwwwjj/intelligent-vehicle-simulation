@@ -9,7 +9,7 @@
 最近一次计算的纵向加速度作恒加速度外推，并在预测速度到零时截断位置。
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import numpy as np
 from src.common.state import ObstacleState, ObstacleType, TrajectoryPoint
 
@@ -83,13 +83,17 @@ class MOBILLaneChangeModel:
 class ObstacleManager:
     """
     仿真环境障碍物时空状态演化管理器
-    负责多障碍物的步进模拟、轨迹预测生成与查询
+    负责多障碍物的步进模拟、轨迹预测生成与查询。
+    支持 IDM 跟驰与 MOBIL 协同换道模型。
     """
-    def __init__(self):
+    def __init__(self, enable_mobil: bool = False, lane_width: float = 3.75):
         self.obstacles: Dict[str, ObstacleState] = {}
         self.idm_models: Dict[str, IntelligentDriverModel] = {}
         self._last_accelerations: Dict[str, float] = {}
         self.mobil_model = MOBILLaneChangeModel()
+        self.enable_mobil: bool = enable_mobil
+        self.lane_width: float = lane_width
+        self._lane_change_states: Dict[str, Dict[str, Any]] = {}
 
     def add_obstacle(self, obstacle: ObstacleState, idm: Optional[IntelligentDriverModel] = None) -> None:
         """注册障碍物"""
@@ -97,8 +101,8 @@ class ObstacleManager:
         if idm is not None:
             self.idm_models[obstacle.id] = idm
 
-    def _find_lead(self, obstacle: ObstacleState) -> Optional[ObstacleState]:
-        """在当前障碍物同车道正前方寻找最近前车（直线道路按横向距离分道）。"""
+    def _find_lead_at_y(self, obstacle: ObstacleState, check_y: float) -> Optional[ObstacleState]:
+        """在指定横向车道线正前方寻找最近前车。"""
         lead = None
         min_gap = float("inf")
         for other in self.obstacles.values():
@@ -106,8 +110,7 @@ class ObstacleManager:
                 continue
             if other.x <= obstacle.x:
                 continue
-            lateral_gap = abs(other.y - obstacle.y)
-            if lateral_gap > 0.5 * (obstacle.width + other.width) + 0.5:
+            if abs(other.y - check_y) > 0.5 * (obstacle.width + other.width) + 0.5:
                 continue
             gap = other.x - obstacle.x - 0.5 * (obstacle.length + other.length)
             if gap < min_gap:
@@ -115,12 +118,142 @@ class ObstacleManager:
                 lead = other
         return lead
 
+    def _find_follower_at_y(self, obstacle: ObstacleState, check_y: float) -> Optional[ObstacleState]:
+        """在指定横向车道线后方寻找最近后车。"""
+        follower = None
+        min_gap = float("inf")
+        for other in self.obstacles.values():
+            if other.id == obstacle.id:
+                continue
+            if other.x >= obstacle.x:
+                continue
+            if abs(other.y - check_y) > 0.5 * (obstacle.width + other.width) + 0.5:
+                continue
+            gap = obstacle.x - other.x - 0.5 * (obstacle.length + other.length)
+            if gap < min_gap:
+                min_gap = gap
+                follower = other
+        return follower
+
+    def _find_lead(self, obstacle: ObstacleState) -> Optional[ObstacleState]:
+        """在当前障碍物同车道正前方寻找最近前车。"""
+        return self._find_lead_at_y(obstacle, obstacle.y)
+
+    def _compute_accel_for_pair(
+        self,
+        follower_id: str,
+        follower_speed: float,
+        lead_speed: Optional[float],
+        gap: Optional[float],
+    ) -> float:
+        idm = self.idm_models.get(follower_id)
+        if idm is None:
+            return 0.0
+        if lead_speed is None or gap is None:
+            free = idm.a_max * (1.0 - (follower_speed / max(1e-3, idm.v0)) ** 4)
+            return float(np.clip(free, -7.0, idm.a_max))
+        return idm.compute_acceleration(
+            current_speed=follower_speed,
+            lead_speed=max(0.0, lead_speed),
+            distance=max(0.1, gap),
+        )
+
+    def _evaluate_mobil_lane_change(self, obs_id: str, obs: ObstacleState, current_accel: float) -> Optional[float]:
+        """评估障碍物是否满足 MOBIL 换道条件，返回目标车道 y 坐标或 None。"""
+        idm = self.idm_models.get(obs_id)
+        if idm is None:
+            return None
+
+        # 优先考虑左右车道
+        candidate_ys = [obs.y + self.lane_width, obs.y - self.lane_width]
+        for target_y in candidate_ys:
+            target_lead = self._find_lead_at_y(obs, target_y)
+            target_follower = self._find_follower_at_y(obs, target_y)
+
+            # 空间几何间距初检
+            if target_lead is not None:
+                lead_gap = target_lead.x - obs.x - 0.5 * (obs.length + target_lead.length)
+                if lead_gap < idm.s0:
+                    continue
+            if target_follower is not None:
+                foll_gap = obs.x - target_follower.x - 0.5 * (obs.length + target_follower.length)
+                if foll_gap < idm.s0:
+                    continue
+
+            # 1. 目标车道自车预期加速度
+            if target_lead is not None:
+                accel_self_target = idm.compute_acceleration(
+                    current_speed=obs.vx,
+                    lead_speed=max(0.0, target_lead.vx),
+                    distance=max(0.1, target_lead.x - obs.x - 0.5 * (obs.length + target_lead.length)),
+                )
+            else:
+                accel_self_target = idm.a_max * (1.0 - (obs.vx / max(1e-3, idm.v0)) ** 4)
+
+            # 2. 目标车道后车前后加速度
+            if target_follower is not None and target_follower.id in self.idm_models:
+                foll_idm = self.idm_models[target_follower.id]
+                foll_cur_lead = target_lead  # 原前车即 target_lead
+                foll_cur_gap = (
+                    target_lead.x - target_follower.x - 0.5 * (target_follower.length + target_lead.length)
+                    if target_lead is not None else None
+                )
+                accel_new_follower_before = self._compute_accel_for_pair(
+                    target_follower.id, target_follower.vx,
+                    target_lead.vx if target_lead else None, foll_cur_gap
+                )
+                new_gap = obs.x - target_follower.x - 0.5 * (obs.length + target_follower.length)
+                accel_new_follower_after = foll_idm.compute_acceleration(
+                    current_speed=target_follower.vx,
+                    lead_speed=max(0.0, obs.vx),
+                    distance=max(0.1, new_gap),
+                )
+            else:
+                accel_new_follower_before = 0.0
+                accel_new_follower_after = 0.0
+
+            # 3. 原车道后车前后加速度
+            cur_follower = self._find_follower_at_y(obs, obs.y)
+            cur_lead = self._find_lead(obs)
+            if cur_follower is not None and cur_follower.id in self.idm_models:
+                foll_idm = self.idm_models[cur_follower.id]
+                gap_before = obs.x - cur_follower.x - 0.5 * (cur_follower.length + obs.length)
+                accel_old_follower_before = foll_idm.compute_acceleration(
+                    current_speed=cur_follower.vx,
+                    lead_speed=max(0.0, obs.vx),
+                    distance=max(0.1, gap_before),
+                )
+                if cur_lead is not None:
+                    gap_after = cur_lead.x - cur_follower.x - 0.5 * (cur_follower.length + cur_lead.length)
+                    accel_old_follower_after = foll_idm.compute_acceleration(
+                        current_speed=cur_follower.vx,
+                        lead_speed=max(0.0, cur_lead.vx),
+                        distance=max(0.1, gap_after),
+                    )
+                else:
+                    accel_old_follower_after = foll_idm.a_max * (1.0 - (cur_follower.vx / max(1e-3, foll_idm.v0)) ** 4)
+            else:
+                accel_old_follower_before = 0.0
+                accel_old_follower_after = 0.0
+
+            if self.mobil_model.check_lane_change(
+                accel_self_cur=current_accel,
+                accel_self_target=accel_self_target,
+                accel_new_follower_before=accel_new_follower_before,
+                accel_new_follower_after=accel_new_follower_after,
+                accel_old_follower_before=accel_old_follower_before,
+                accel_old_follower_after=accel_old_follower_after,
+            ):
+                return target_y
+
+        return None
+
     def step(self, dt: float) -> None:
         """
         环境物理演化一个时步 dt。
-        注册了 IDM 的交通参与者按跟驰模型更新纵向速度；其余参与者保持匀速。
+        注册了 IDM 的交通参与者按跟驰模型更新纵向速度；若启用 MOBIL 则评估换道；其余参与者保持匀速。
         """
-        # 先基于当前状态计算加速度，再统一积分，避免同一时步内顺序依赖
+        # 1. 计算纵向加速度
         accelerations: Dict[str, float] = {}
         for obs_id, obs in self.obstacles.items():
             idm = self.idm_models.get(obs_id)
@@ -139,14 +272,48 @@ class ObstacleManager:
                     distance=max(0.1, gap),
                 )
 
+        # 2. MOBIL 换道状态机更新
+        if self.enable_mobil:
+            for obs_id, obs in self.obstacles.items():
+                if obs_id in self._lane_change_states:
+                    continue
+                accel = accelerations.get(obs_id, 0.0)
+                target_y = self._evaluate_mobil_lane_change(obs_id, obs, accel)
+                if target_y is not None:
+                    self._lane_change_states[obs_id] = {
+                        "target_y": target_y,
+                        "start_y": obs.y,
+                        "duration": 2.5,
+                        "elapsed": 0.0,
+                    }
+
+        # 3. 积分位姿与横向状态
         for obs_id, obs in self.obstacles.items():
             accel = accelerations.get(obs_id, 0.0)
             self._last_accelerations[obs_id] = accel
             obs.vx = float(max(0.0, obs.vx + accel * dt))
+
+            # 横向换道过渡 (平滑三次多项式插值)
+            lc_state = self._lane_change_states.get(obs_id)
+            if lc_state is not None:
+                lc_state["elapsed"] += dt
+                p = float(np.clip(lc_state["elapsed"] / max(1e-3, lc_state["duration"]), 0.0, 1.0))
+                # 3p^2 - 2p^3 平滑过渡
+                y_delta = lc_state["target_y"] - lc_state["start_y"]
+                obs.y = float(lc_state["start_y"] + y_delta * (3.0 * p ** 2 - 2.0 * p ** 3))
+                # dy/dt = y_delta * (6p - 6p^2) / duration
+                obs.vy = float(y_delta * (6.0 * p * (1.0 - p)) / max(1e-3, lc_state["duration"]))
+                if p >= 1.0:
+                    obs.y = float(lc_state["target_y"])
+                    obs.vy = 0.0
+                    del self._lane_change_states[obs_id]
+            else:
+                obs.y += obs.vy * dt
+
             if abs(obs.vx) > 1e-6 or abs(obs.vy) > 1e-6:
                 obs.heading = float(np.arctan2(obs.vy, obs.vx))
             obs.x += obs.vx * dt
-            obs.y += obs.vy * dt
+
             self.generate_predicted_trajectory(obs_id, horizon=6.0, dt=0.2)
 
     def generate_predicted_trajectory(self, obstacle_id: str, horizon: float = 5.0, dt: float = 0.2) -> List[TrajectoryPoint]:

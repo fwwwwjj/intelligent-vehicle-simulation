@@ -203,8 +203,8 @@ sequenceDiagram
 - **契约**：纯数据容器（`VehicleState` / `TrajectoryPoint` / `FrenetPoint` / `ObstacleState` / `ReferencePoint`）统一使用 Python `@dataclass`；几何/碰撞类（`Point2D` / `BoundingBox2D`）允许使用普通类，但字段、单位与构造参数必须有清晰注释。
 
 ### 2. `src/environment/` (环境层)
-- **职责**：管理道路几何拓扑（`RoadNetwork`）、场景装载（`scenario_loader.py`）、真实交通数据集解析（`BaseDatasetLoader`）与多车动态微观演化（`ObstacleManager`）；
-- **当前实现**：IDM 跟驰已进入 `ObstacleManager.step()`，背景车预测使用最近一次计算的纵向加速度作恒加速度外推并在零速处停止；MOBIL 换道判定公式已保留，但尚未接入换道状态机；highD 格式 CSV 解析器已实现（`HighDDatasetLoader`），但仓库未附带数据、未完成 IDM 标定；INTERACTION/NGSIM 仍为接口骨架。
+- **职责**：管理道路几何拓扑（`RoadNetwork`）、场景装载（`scenario_loader.py`）、真实交通数据集解析（`BaseDatasetLoader`）、交通流参数辨识（`calibration.py`）与多车动态微观演化（`ObstacleManager`）；
+- **当前实现**：IDM 跟驰已进入 `ObstacleManager.step()`，背景车预测使用最近一次计算的纵向加速度作恒加速度外推并在零速处停止；MOBIL 换道状态机已接入 `ObstacleManager`（通过 `enable_mobil=True` 开启，支持平滑三次多项式横向过渡）；highD 格式 CSV 解析器已实现（`HighDDatasetLoader`），并配套微型演示切片生成器（`scripts/generate_sample_highd.py`）与系统辨识工具链（`src/environment/calibration.py`）；INTERACTION/NGSIM 仍为接口骨架。
 - **扩展规范**：若新增数据集解析器（如 Waymo 或 nuScenes），必须继承 `BaseDatasetLoader` 并实现 `load_scenario()` 与 `get_frame_obstacles()`。
 
 ### 3. `src/vehicle_model/` (物理机理层)
@@ -244,7 +244,7 @@ sequenceDiagram
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
 3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
-4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 30 项）。
+4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 35 项）。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
 6. 【未实现接口必须显式失败】：EM/QP、MPC 等尚未实现的算法，调用入口必须抛出 NotImplementedError，禁止返回空 Trajectory / 零控制量冒充有效输出。
 7. 【结果由脚本生成】：KPI 表、曲线与对比数字必须由 scripts/ 下的运行/评测脚本生成；单 seed 结果必须标注，禁止手填或复制旧文档数字。
@@ -253,7 +253,7 @@ sequenceDiagram
 
 ---
 
-## 六、 当前实现边界与验收口径（v0.2）
+## 六、 当前实现边界与验收口径（v0.3）
 
 > 本节用于防止“接口预留”被写成“已完成”。修改代码或文档前，先对照下表。
 
@@ -261,7 +261,7 @@ sequenceDiagram
 
 | 模块 | 入口 | 验收方式 |
 | :--- | :--- | :--- |
-| 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；内置 `highway_merge`、`emergency_avoidance` |
+| 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；内置 `highway_merge`、`emergency_avoidance`、`cut_in` |
 | 道路参考线 | `src/environment/road_network.py` | 生成真实 `s/theta/kappa`，按位置查车道 |
 | Frenet 映射 | `src/common/frenet_frame.py` | 正交投影 + `ref_point_at_s` 插值；`l_prime_prime` 暂置 0，规划器数值重算曲率 |
 | 轨迹规划 | `src/planning/frenet_lattice.py` | 五次多项式 + 时间投影 OBB 碰撞校验 + 曲率/jerk 填充 |
@@ -269,6 +269,9 @@ sequenceDiagram
 | 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
 | 纵向控制 | `src/control/pid_controller.py` | 测量值微分 + 抗积分饱和 |
 | 车辆模型 | `src/vehicle_model/kinematics.py` / `dynamics.py` | 运动学 / 2-DOF 线性轮胎 |
+| 交通演化与换道 | `src/environment/obstacle_manager.py` | IDM 跟驰 + 加速度外推；MOBIL 换道状态机（支持平滑三次多项式过渡） |
+| 数据集解析与演示 | `src/environment/dataset_loader.py` | highD 格式 CSV 解析；微型演示切片 `scripts/generate_sample_highd.py` |
+| 参数标定工具链 | `src/environment/calibration.py` | 基于非线性优化的 IDM 跟驰参数系统辨识 |
 | KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、OBB 净距、TTC、横向/航向误差、Δa/Δt jerk、时延拆分 |
 | 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 多决策 × 多场景，输出 JSON/CSV |
 
@@ -276,11 +279,11 @@ sequenceDiagram
 
 | 功能 | 现状 | 禁止表述 |
 | :--- | :--- | :--- |
-| highD / INTERACTION / NGSIM | highD 格式 CSV 可解析；仓库无数据、未标定；INTERACTION/NGSIM 返回元数据/空列表 | “已用真实数据标定” |
+| INTERACTION / NGSIM | 接口骨架，返回元数据/空列表 | “已接入 INTERACTION/NGSIM” |
+| 全量实测数据生产标定 | 具备标定工具链与微型演示切片；仓库未附带数十 GB 全量数据 | “已用全量实车数据完成生产标定” |
 | EM / QP 规划 | `em_planner.py::plan` 抛出 `NotImplementedError` | “已实现 EM 规划器” |
 | MPC | `mpc_controller.py::compute_control` 抛出 `NotImplementedError` | “已实现 MPC 跟踪” |
 | Pacejka 轮胎 | `pacejka_tire_model()` 未被 `step()` 调用 | “已采用 Pacejka 非线性轮胎” |
-| MOBIL | 公式类存在，未进入 `ObstacleManager.step()` | “已实现 MOBIL 换道” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
 
 ### 3. 指标口径

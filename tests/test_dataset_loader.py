@@ -146,6 +146,19 @@ class TestHighDDatasetLoader(unittest.TestCase):
         with self.assertRaises(ValueError):
             loader.load_scenario(str(self.root / "02_tracks.csv"))
 
+    def test_load_sample_highd_directory(self):
+        sample_path = Path("data/sample_highd")
+        if not (sample_path / "01_tracks.csv").exists():
+            from scripts.generate_sample_highd import generate_sample_highd
+            generate_sample_highd(str(sample_path), "01")
+
+        loader = HighDDatasetLoader(str(sample_path))
+        meta = loader.load_scenario(str(sample_path / "01_tracks.csv"))
+        self.assertEqual(meta["dataset_name"], "highD")
+        self.assertGreaterEqual(meta["total_tracks"], 4)
+        obstacles = loader.get_frame_obstacles(0.0)
+        self.assertGreaterEqual(len(obstacles), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

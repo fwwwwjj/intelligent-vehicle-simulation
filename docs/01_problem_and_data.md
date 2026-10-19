@@ -39,7 +39,10 @@ window = loader.extract_window(0.0, 10.0, ego_id=123, radius=80.0)
 
 > 解析器保留 highD 原始 x/y 坐标，不做重定心/旋转；`height` 视为车身长度。把 highD 轨迹接入 `RoadNetwork` 前仍需做坐标对齐与场景切片选择。
 
-**当前实验数据来源**：`configs/scenarios/*.yaml` 中的**人工构造合成场景**（高速汇入、前方静止车辆）。这些场景用于验证闭环链路与指标计算是否正确，不代表真实交通流分布。
+**当前实验数据来源**：
+1. `configs/scenarios/*.yaml` 中的典型场景（高速汇入 `highway_merge`、前方静止紧急避撞 `emergency_avoidance`、近距离激进切入 `cut_in`），用于覆盖 ODD 核心功能安全与控制边界验证；
+2. `scripts/generate_sample_highd.py` 提供的微型 highD 演示切片（`data/sample_highd/`），用于端到端验证真实数据集加载器 `HighDDatasetLoader` 的解析、时间窗截取与时空查询能力；
+3. `src/environment/calibration.py` 提供的 IDM 跟驰参数系统辨识与标定流水线，支持在有实车跟驰时空轨迹时自动拟合微观交通流参数。
 
 ### 2.2 场景描述与数字格式
 

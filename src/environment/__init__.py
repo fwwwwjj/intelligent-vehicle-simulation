@@ -21,6 +21,8 @@ __all__ = [
     "load_named_scenario",
     "build_highway_merge_scenario",
     "build_emergency_avoidance_scenario",
+    "build_cut_in_scenario",
+    "IDMCalibrator",
 ]
 
 _LAZY = {
@@ -38,6 +40,8 @@ _LAZY = {
     "load_named_scenario": ("src.environment.scenario_loader", "load_named_scenario"),
     "build_highway_merge_scenario": ("src.environment.scenario_loader", "build_highway_merge_scenario"),
     "build_emergency_avoidance_scenario": ("src.environment.scenario_loader", "build_emergency_avoidance_scenario"),
+    "build_cut_in_scenario": ("src.environment.scenario_loader", "build_cut_in_scenario"),
+    "IDMCalibrator": ("src.environment.calibration", "IDMCalibrator"),
 }
 
 

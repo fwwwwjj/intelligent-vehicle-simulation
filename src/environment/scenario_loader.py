@@ -130,6 +130,35 @@ EMERGENCY_AVOIDANCE_DICT: Dict[str, Any] = {
 }
 
 
+CUT_IN_DICT: Dict[str, Any] = {
+    "scenario_id": "SCENARIO_HIGHWAY_CUT_IN_01",
+    "description": "主车在主线巡航，邻道车辆突然近距离向主车道变道切入，验证减速与避撞博弈",
+    "map": {
+        "type": "highway_straight",
+        "main_lanes_count": 2,
+        "road_length": 500.0,
+        "ramp_length": 1.0,
+        "lane_width": 3.75,
+        "speed_limit": 22.22,
+    },
+    "ego_initial_state": {"x": 0.0, "y": 0.0, "v": 20.0, "heading": 0.0, "lane_id": "main_lane_0"},
+    "obstacles": [
+        {
+            "id": "obs_cut_in",
+            "type": "car",
+            "initial_state": {"x": 25.0, "y": 3.75, "v": 16.0, "heading": -0.06, "lane_id": "main_lane_1"},
+            "behavior_type": "constant_speed",
+        },
+        {
+            "id": "obs_lead_far",
+            "type": "car",
+            "initial_state": {"x": 80.0, "y": 0.0, "v": 22.0, "heading": 0.0, "lane_id": "main_lane_0"},
+            "behavior_type": "constant_speed",
+        },
+    ],
+}
+
+
 @dataclass
 class Scenario:
     """仿真场景的完整执行上下文。"""
@@ -315,9 +344,15 @@ def build_emergency_avoidance_scenario() -> Scenario:
     return _build_from_dict(EMERGENCY_AVOIDANCE_DICT, DEFAULT_CONFIG, name="emergency_avoidance")
 
 
+def build_cut_in_scenario() -> Scenario:
+    """不依赖 PyYAML 的邻车切入场景。"""
+    return _build_from_dict(CUT_IN_DICT, DEFAULT_CONFIG, name="cut_in")
+
+
 _BUILTIN_SCENARIO_BUILDERS = {
     "highway_merge": build_highway_merge_scenario,
     "emergency_avoidance": build_emergency_avoidance_scenario,
+    "cut_in": build_cut_in_scenario,
 }
 
 

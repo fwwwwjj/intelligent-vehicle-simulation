@@ -1,0 +1,28 @@
+# 场景描述: 邻道慢车近距离激进切入场景 (Highway Cut-In)
+scenario_id: "SCENARIO_HIGHWAY_CUT_IN_01"
+description: "主车在主线巡航，邻道车辆突然近距离向主车道变道切入，验证减速与避撞博弈"
+
+map:
+  type: "highway_straight"
+  main_lanes_count: 2          # main_lane_0 (y=0), main_lane_1 (y=3.75)
+  road_length: 500.0
+  ramp_length: 1.0
+  lane_width: 3.75
+  speed_limit: 22.22
+
+ego_initial_state:
+  x: 0.0
+  y: 0.0                       # 主车位于 main_lane_0
+  v: 20.0
+  heading: 0.0
+  lane_id: "main_lane_0"
+
+obstacles:
+  - id: "obs_cut_in"
+    type: "car"
+    initial_state: {x: 25.0, y: 3.75, v: 16.0, heading: -0.06, lane_id: "main_lane_1"}
+    behavior_type: "constant_speed"
+  - id: "obs_lead_far"
+    type: "car"
+    initial_state: {x: 80.0, y: 0.0, v: 22.0, heading: 0.0, lane_id: "main_lane_0"}
+    behavior_type: "constant_speed"

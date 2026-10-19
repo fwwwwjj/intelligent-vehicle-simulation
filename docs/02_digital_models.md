@@ -128,5 +128,6 @@ $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c
 | 纵向 PID | `src/control/pid_controller.py` | ✅ 测量值微分 + 抗积分饱和 |
 | MPC | `src/control/mpc_controller.py` | ⏳ 接口骨架，调用抛出 `NotImplementedError` |
 | IDM 跟驰与加速度外推 | `src/environment/obstacle_manager.py` | ✅ 背景车步进；预测使用最近一次 IDM 纵向加速度，制动至零速后停止外推 |
-| MOBIL 换道 | `obstacle_manager.py::MOBILLaneChangeModel` | ⏳ 公式实现，未接入步进 |
-| 真实数据集加载 | `src/environment/dataset_loader.py` | ✅ highD 格式 CSV 解析；⏳ 未附带数据、未标定，INTERACTION/NGSIM 仍为接口 |
+| MOBIL 换道 | `obstacle_manager.py::ObstacleManager` | ✅ 接入换道状态机，支持多车道平滑三次多项式换道过渡 |
+| 真实数据集加载 | `src/environment/dataset_loader.py` | ✅ highD 格式 CSV 解析；配套生成微型样例 `scripts/generate_sample_highd.py` |
+| 参数标定工具链 | `src/environment/calibration.py` | ✅ 基于最小二乘优化的 IDM 跟驰参数辨识工具链 |

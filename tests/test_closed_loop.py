@@ -19,6 +19,7 @@ from src.decision.rule_based_fsm import HierarchicalFSMDecisionMaker
 from src.environment.obstacle_manager import ObstacleManager
 from src.environment.road_network import Lane, RoadNetwork
 from src.environment.scenario_loader import (
+    build_cut_in_scenario,
     build_emergency_avoidance_scenario,
     build_highway_merge_scenario,
     load_named_scenario,
@@ -195,6 +196,15 @@ class TestClosedLoop(unittest.TestCase):
         self.assertAlmostEqual(engine_a.ego_state.y, engine_b.ego_state.y, places=9)
         self.assertAlmostEqual(engine_a.ego_state.velocity, engine_b.ego_state.velocity, places=9)
         self.assertEqual(len(engine_a.evaluator.records), len(engine_b.evaluator.records))
+
+    def test_named_cut_in_scenario_loads_and_runs(self):
+        scenario = load_named_scenario("cut_in")
+        self.assertEqual(scenario.name, "cut_in")
+        engine = build_engine(scenario, decision="fsm", enable_visualization=False)
+        for _ in range(20):
+            engine.step()
+        self.assertGreater(engine.ego_state.x, 0.0)
+        self.assertEqual(len(engine.evaluator.records), 20)
 
 
 if __name__ == "__main__":

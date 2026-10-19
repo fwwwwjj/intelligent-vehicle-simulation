@@ -46,6 +46,21 @@ class TestObstaclePrediction(unittest.TestCase):
         self.assertAlmostEqual(prediction[-1].x, prediction[-2].x)
         self.assertGreaterEqual(prediction[-1].v, 0.0)
 
+    def test_mobil_lane_change_execution(self):
+        # 慢前车在原车道 (y=0)，跟驰车在启用 MOBIL 后换道至目标车道 (y=3.75)
+        manager = ObstacleManager(enable_mobil=True, lane_width=3.75)
+        slow_lead = _car("slow_lead", 30.0, 5.0)
+        follower = _car("follower", 10.0, 15.0)
+        manager.add_obstacle(slow_lead)
+        manager.add_obstacle(follower, IntelligentDriverModel(v0=25.0, s0=3.0, T=1.5, a_max=2.0, b_desired=2.0))
+
+        # 演化 3 秒，检查是否成功发起并完成向 y=3.75 换道
+        for _ in range(60):
+            manager.step(0.05)
+
+        self.assertGreater(follower.y, 2.0)
+        self.assertAlmostEqual(follower.y, 3.75, delta=0.5)
+
 
 if __name__ == "__main__":
     unittest.main()
