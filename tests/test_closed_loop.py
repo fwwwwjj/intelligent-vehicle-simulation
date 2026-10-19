@@ -18,7 +18,11 @@ from src.decision.base_decision import DecisionOutput, DrivingIntent
 from src.decision.rule_based_fsm import HierarchicalFSMDecisionMaker
 from src.environment.obstacle_manager import ObstacleManager
 from src.environment.road_network import Lane, RoadNetwork
-from src.environment.scenario_loader import build_highway_merge_scenario
+from src.environment.scenario_loader import (
+    build_emergency_avoidance_scenario,
+    build_highway_merge_scenario,
+    load_named_scenario,
+)
 from src.planning.frenet_lattice import FrenetLatticePlanner
 from src.runner import build_engine
 from src.simulator import SimulationEngine
@@ -47,6 +51,42 @@ class TestClosedLoop(unittest.TestCase):
         self.assertIn("main_lane_1", scenario.road_network.lanes)
         self.assertGreater(len(scenario.road_network.get_reference_line("main_lane_0")), 10)
         self.assertEqual(scenario.current_lane_id, "ramp_0")
+
+    def test_straight_scenario_does_not_add_phantom_ramp(self):
+        scenario = build_emergency_avoidance_scenario()
+        self.assertNotIn("ramp_0", scenario.road_network.lanes)
+        main_lane = scenario.road_network.get_lane("main_lane_0")
+        self.assertIsNotNone(main_lane)
+        self.assertIsNone(main_lane.right_lane_id)
+        self.assertEqual(scenario.current_lane_id, "main_lane_0")
+
+    def test_named_emergency_scenario_falls_back_when_yaml_unavailable(self):
+        # 本机未安装 PyYAML 时，旧实现只对 highway_merge 回退，导致
+        # `run_simulation.py --scenario emergency_avoidance` 直接抛错。
+        scenario = load_named_scenario("emergency_avoidance")
+        self.assertIn("main_lane_0", scenario.road_network.lanes)
+        self.assertNotIn("ramp_0", scenario.road_network.lanes)
+        self.assertEqual(scenario.current_lane_id, "main_lane_0")
+
+    def test_fsm_uses_configured_ego_dimensions(self):
+        network = _straight_network()
+        fsm = HierarchicalFSMDecisionMaker(
+            road_network=network, ego_length=10.0, ego_width=3.0
+        )
+        ego = VehicleState(x=0.0, y=0.0, heading=0.0, velocity=15.0, vx=15.0)
+        lead_obs = ObstacleState(
+            id="lead",
+            obstacle_type=ObstacleType.CAR,
+            x=20.0,
+            y=0.0,
+            length=4.8,
+            width=1.9,
+            heading=0.0,
+            vx=15.0,
+        )
+        lead, gap = fsm._find_lead(ego, [lead_obs], "main_lane_0")
+        self.assertIs(lead, lead_obs)
+        self.assertAlmostEqual(gap, 20.0 - 0.5 * (10.0 + 4.8))
 
     def test_controller_tracks_lower_target_speed(self):
         controller = LQRController()

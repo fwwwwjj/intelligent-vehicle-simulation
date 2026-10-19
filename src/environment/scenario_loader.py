@@ -189,6 +189,15 @@ def _build_road_network(data: Dict[str, Any], config: Dict[str, Any]) -> RoadNet
     main_lanes = int(map_cfg.get("main_lanes_count", 2))
     ramp_length = float(map_cfg.get("ramp_length", 150.0))
     speed_limit = float(map_cfg.get("speed_limit", config["environment"]["speed_limit"]))
+    map_type = str(map_cfg.get("type", "")).lower()
+
+    # 只有匝道/汇入类地图才应该生成 ramp_0。早期实现无条件给所有场景
+    # 加一条与主线等长的“幽灵匝道”，会让直线场景的多余车道参与最近车道查询。
+    has_ramp = (
+        bool(map_cfg.get("has_ramp", False))
+        or "ramp" in map_type
+        or map_type in {"merge", "highway_merge"}
+    )
 
     road = RoadNetwork()
 
@@ -209,11 +218,17 @@ def _build_road_network(data: Dict[str, Any], config: Dict[str, Any]) -> RoadNet
     for i in range(main_lanes):
         lane_id = f"main_lane_{i}"
         left = f"main_lane_{i + 1}" if i + 1 < main_lanes else None
-        right = f"main_lane_{i - 1}" if i > 0 else "ramp_0"
+        if i > 0:
+            right = f"main_lane_{i - 1}"
+        elif has_ramp:
+            right = "ramp_0"
+        else:
+            right = None
         add_straight_lane(lane_id, i * lane_width, road_length, left, right)
 
-    # 匝道：位于主线右侧（y 为负），长度可与主线不同
-    add_straight_lane("ramp_0", -lane_width, max(ramp_length, road_length), None, "main_lane_0")
+    # 匝道：位于主线右侧（y 为负），仅在汇入类地图中生成
+    if has_ramp:
+        add_straight_lane("ramp_0", -lane_width, ramp_length, None, "main_lane_0")
 
     for lane_id in road.lanes:
         road.generate_reference_line(lane_id, sample_step=1.0)
@@ -300,6 +315,12 @@ def build_emergency_avoidance_scenario() -> Scenario:
     return _build_from_dict(EMERGENCY_AVOIDANCE_DICT, DEFAULT_CONFIG, name="emergency_avoidance")
 
 
+_BUILTIN_SCENARIO_BUILDERS = {
+    "highway_merge": build_highway_merge_scenario,
+    "emergency_avoidance": build_emergency_avoidance_scenario,
+}
+
+
 def load_scenario(path: str, config_path: Optional[str] = None) -> Scenario:
     """
     从 YAML/JSON 文件加载场景。
@@ -333,26 +354,27 @@ def load_named_scenario(name_or_path: str) -> Scenario:
     按名称或路径加载场景。
 
     - 传入存在的文件路径：直接加载；
-    - 传入 ``highway_merge`` 且 YAML 不可用/不存在：回退到内置场景；
+    - 传入 ``highway_merge`` / ``emergency_avoidance`` 且 PyYAML 不可用：回退到内置场景；
     - 其他名称：在 ``configs/scenarios/<name>.yaml`` 中查找。
     """
     candidate = Path(name_or_path)
     if candidate.exists():
         return load_scenario(str(candidate))
 
+    builtin_builder = _BUILTIN_SCENARIO_BUILDERS.get(name_or_path)
     scenario_path = REPO_ROOT / "configs" / "scenarios" / f"{name_or_path}.yaml"
     if scenario_path.exists():
         try:
             return load_scenario(str(scenario_path))
         except RuntimeError:
-            if name_or_path == "highway_merge":
-                return build_highway_merge_scenario()
+            # PyYAML 缺失时，所有内置场景都应能回退，而不是只有 highway_merge。
+            if builtin_builder is not None:
+                return builtin_builder()
             raise
-    if name_or_path == "highway_merge":
-        return build_highway_merge_scenario()
-    if name_or_path == "emergency_avoidance":
-        return build_emergency_avoidance_scenario()
+    if builtin_builder is not None:
+        return builtin_builder()
     raise FileNotFoundError(
-        f"Unknown scenario '{name_or_path}'. Available built-in: highway_merge; "
+        f"Unknown scenario '{name_or_path}'. "
+        f"Available built-in: {sorted(_BUILTIN_SCENARIO_BUILDERS)}; "
         f"expected file: {scenario_path}"
     )

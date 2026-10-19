@@ -64,14 +64,16 @@ class PerformanceEvaluator:
         latencies = [r.planning_latency_ms for r in self.records]
         decision_latencies = [r.decision_latency_ms for r in self.records]
         control_latencies = [r.control_latency_ms for r in self.records]
-        collision_count = sum(1 for r in self.records if r.is_collision)
-        collision_frames = sum(r.collision_count for r in self.records)
+        # 口径区分：collision_count 是“碰撞障碍物数量之和”（可能一帧多车），
+        # collision_frames 是“发生碰撞的帧数”（可能一帧多车只计一次）。
+        collision_obstacle_count = sum(r.collision_count for r in self.records)
+        collision_frame_count = sum(1 for r in self.records if r.is_collision)
 
         return {
-            "success_rate": 0.0 if collision_frames > 0 else 1.0,
-            "collision_count": float(collision_frames),
-            "collision_frames": float(collision_count),
-            "collision_rate": float(collision_count / len(self.records)),
+            "success_rate": 0.0 if collision_obstacle_count > 0 else 1.0,
+            "collision_count": float(collision_obstacle_count),
+            "collision_frames": float(collision_frame_count),
+            "collision_rate": float(collision_frame_count / len(self.records)),
             "min_obstacle_distance_m": float(np.min(dists)) if dists else 999.0,
             "min_ttc_s": float(np.min(ttcs)) if ttcs else 999.0,
             "rms_jerk_m_s3": float(np.sqrt(np.mean(np.square(jerks)))),

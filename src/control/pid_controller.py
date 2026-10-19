@@ -3,6 +3,8 @@
 具备抗积分饱和 (Anti-windup) 与低通微分滤波机制。
 """
 
+from __future__ import annotations
+
 import numpy as np
 
 
@@ -19,7 +21,6 @@ class LongitudinalPIDController:
 
         self._integral_error = 0.0
         self._prev_error = 0.0
-        self._prev_speed = None
         self._prev_speed: float | None = None
 
     def compute(self, target_speed: float, current_speed: float, dt: float) -> float:
@@ -51,5 +52,4 @@ class LongitudinalPIDController:
         """重置控制器历史内部状态"""
         self._integral_error = 0.0
         self._prev_error = 0.0
-        self._prev_speed = None
         self._prev_speed: float | None = None

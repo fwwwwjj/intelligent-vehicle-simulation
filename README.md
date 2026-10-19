@@ -6,7 +6,7 @@
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![Build Status](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 
-> 本项目为**中国仿真创新应用大赛**参赛项目研发框架。针对智能车辆在复杂高动态、强交互道路场景下的行为决策与轨迹规划难题，当前版本已构建涵盖**数字道路环境**、**虚拟感知模型**、**规则/博弈分层决策**、**Frenet Lattice 轨迹规划**、**LQR + PID 跟踪控制**及**真实 KPI 量化评估**的闭环仿真基线。EM/QP、MPC、MOBIL 换道与真实数据集接入是后续迭代项，当前实现边界见文末。
+> 本项目为**中国仿真创新应用大赛**参赛项目研发框架。针对智能车辆在复杂高动态、强交互道路场景下的行为决策与轨迹规划难题，当前版本已构建涵盖**数字道路环境**、**虚拟感知模型**、**规则/博弈分层决策**、**Frenet Lattice 轨迹规划**、**LQR + PID 跟踪控制**及**真实 KPI 量化评估**的闭环仿真基线。EM/QP、MPC、MOBIL 换道与 highD 数据标定是后续迭代项，当前实现边界见文末。
 
 > 📖 **开发者与 AI 协作规范指南**：本项目提供完备的系统开发与变量口径说明书，请直接参阅 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)。后续人类工程师或 AI 编码工具在进行算法修改、代码生成与扩展时，请严格以该文件作为单一真实数据源（SSOT）。
 
@@ -30,7 +30,7 @@
 
 | 竞赛评审要求模块 | 对应技术文档 | 对应源码与实现接口 |
 | :--- | :--- | :--- |
-| **1. 问题来源和数据来源说明** | [docs/01_problem_and_data.md](docs/01_problem_and_data.md) | `src/environment/dataset_loader.py` (highD/INTERACTION/NGSIM 接口骨架，未接入数据) |
+| **1. 问题来源和数据来源说明** | [docs/01_problem_and_data.md](docs/01_problem_and_data.md) | `src/environment/dataset_loader.py` (highD 格式 CSV 解析器；INTERACTION/NGSIM 仍为接口，未附带数据) |
 | **2. 数字模型或系统** | [docs/02_digital_models.md](docs/02_digital_models.md) | `src/vehicle_model/` (运动学/二自由度线性轮胎), `src/decision/`, `src/planning/` |
 | **3. 结果演示分析或说明** | [docs/03_results_and_demo.md](docs/03_results_and_demo.md) | `src/evaluation/metrics.py`, `src/visualization/` (2D BEV 实时动画与 KPI 报告) |
 | **4. 应用说明与工程落地** | [docs/04_application.md](docs/04_application.md) | `src/simulator.py` (SIL/MIL 闭环、教学实验；ROS/CARLA 为路线图) |
@@ -44,7 +44,7 @@
 
 ```mermaid
 flowchart LR
-    A["真实数据集接口<br/>(未接入)"] --> B["数字路网与交通流<br/>(RoadNetwork + IDM 跟驰)"]
+    A["真实数据集接口<br/>(highD 格式可解析)"] --> B["数字路网与交通流<br/>(RoadNetwork + IDM 跟驰)"]
     B --> C["车载感知数字孪生<br/>(LiDAR / Camera FOV)"]
     C --> D["行为决策层<br/>(HFSM / Game-Theoretic)"]
     D --> E["时空轨迹规划层<br/>(Frenet Lattice + OBB 碰撞校验)"]
@@ -70,7 +70,7 @@ intelligent-vehicle-simulation/
 ├── docs/                       # 比赛申报规范技术报告 (5大核心章节)
 ├── src/                        # 核心仿真引擎与算法接口
 │   ├── common/                 # 车辆状态、Frenet双向映射、OBB包围盒 SAT 碰撞检测
-│   ├── environment/            # 道路网络、场景加载、IDM 跟驰；MOBIL/真实数据集为接口预留
+│   ├── environment/            # 道路网络、场景加载、IDM 跟驰、highD CSV 解析；MOBIL/INTERACTION 为接口预留
 │   ├── vehicle_model/          # 运动学、2-DOF 动力学与传感器模型；Pacejka 为接口预留
 │   ├── decision/               # 分层有限状态机 (HFSM) 与博弈交互决策器接口
 │   ├── planning/               # Frenet Lattice 采样 + 碰撞校验；EM/QP 为接口预留
@@ -126,7 +126,9 @@ python3 scripts/run_simulation.py --scenario highway_merge --decision game --dur
 python3 -m unittest discover tests -v
 ```
 
-当前共 15 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、seed 复现与闭环速度跟踪。
+当前共 28 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、seed 复现与闭环速度跟踪。
+
+> 开发期建议只跑上述单元测试（约 3 s）。多 seed `run_benchmark.py`、可视化渲染与图表导出会持续占用 CPU，建议在空闲时段单独运行，避免与日常编码并行导致机器过热。
 
 ### 4. 导出竞赛报告高清科研图表
 ```bash
@@ -163,7 +165,7 @@ python3 scripts/export_results.py --scenario highway_merge --decision fsm --dura
 - `highway_merge` 与 `emergency_avoidance` 两个内置场景、YAML/JSON 场景加载、seed 复现。
 
 **接口预留 / 尚未完成：**
-- highD / INTERACTION / NGSIM 真实数据文件读取与标定（当前 loader 只返回元数据，未附带数据）；
+- highD 真实数据标定与 INTERACTION/NGSIM 接入（highD 格式 CSV 解析器已实现，但仓库未附带数据、尚未标定；INTERACTION/NGSIM 仍为接口）；
 - MOBIL 换道模型、EM/QP 速度剖面、MPC、Pacejka 非线性轮胎进入主回路；
 - 城市无保护路口、真实 cut-in 场景、OpenSCENARIO / ROS / CARLA 联合仿真；
 - 大规模多 seed 统计与置信区间。

@@ -29,12 +29,16 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
         road_network: Optional["RoadNetwork"] = None,
         merge_lead_gap: float = 20.0,
         merge_follow_gap: float = 15.0,
+        ego_length: float = 4.8,
+        ego_width: float = 1.9,
     ):
         self.desired_speed = desired_speed
         self.min_ttc_threshold = min_ttc_threshold
         self.road_network = road_network
         self.merge_lead_gap = merge_lead_gap
         self.merge_follow_gap = merge_follow_gap
+        self.ego_length = float(ego_length)
+        self.ego_width = float(ego_width)
         self.current_state = DrivingIntent.CRUISE
 
     # ------------------------------------------------------------------
@@ -60,9 +64,9 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
             if dx <= 0.0:
                 continue
             lateral = abs(obs.y - center_y) if center_y is not None else abs(obs.y - ego_state.y)
-            if lateral > 0.5 * (1.9 + obs.width) + 0.4:
+            if lateral > 0.5 * (self.ego_width + obs.width) + 0.4:
                 continue
-            gap = dx - 0.5 * (4.8 + obs.length)
+            gap = dx - 0.5 * (self.ego_length + obs.length)
             if gap < min_gap:
                 min_gap = gap
                 closest_obs = obs
@@ -80,9 +84,9 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
             if dx <= 0.0:
                 continue
             lateral = abs(obs.y - center_y) if center_y is not None else abs(obs.y - ego_state.y)
-            if lateral > 0.5 * (1.9 + obs.width) + 0.4:
+            if lateral > 0.5 * (self.ego_width + obs.width) + 0.4:
                 continue
-            gap = dx - 0.5 * (4.8 + obs.length)
+            gap = dx - 0.5 * (self.ego_length + obs.length)
             if gap < min_gap:
                 min_gap = gap
                 closest_obs = obs

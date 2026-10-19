@@ -129,4 +129,4 @@ $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c
 | MPC | `src/control/mpc_controller.py` | ⏳ 接口骨架，调用抛出 `NotImplementedError` |
 | IDM 跟驰 | `src/environment/obstacle_manager.py` | ✅ 背景车步进 |
 | MOBIL 换道 | `obstacle_manager.py::MOBILLaneChangeModel` | ⏳ 公式实现，未接入步进 |
-| 真实数据集加载 | `src/environment/dataset_loader.py` | ⏳ 接口骨架，未接入数据 |
+| 真实数据集加载 | `src/environment/dataset_loader.py` | ✅ highD 格式 CSV 解析；⏳ 未附带数据、未标定，INTERACTION/NGSIM 仍为接口 |

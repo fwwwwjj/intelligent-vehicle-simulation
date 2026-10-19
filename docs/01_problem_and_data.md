@@ -16,15 +16,28 @@
 
 ## 2. 数据来源与当前接入状态
 
-> **必须如实说明**：当前仓库**没有随附** highD / INTERACTION / NGSIM 的原始数据文件，也没有完成基于真实轨迹的参数标定。`src/environment/dataset_loader.py` 目前是**接口骨架**，返回数据集元数据/空列表。以下数据集是后续迭代计划接入的目标，不应在参赛材料中表述为“已用于标定”。
+> **必须如实说明**：当前仓库**没有随附** highD / INTERACTION / NGSIM 的原始数据文件，也没有完成基于真实轨迹的参数标定。`src/environment/dataset_loader.py` 的 **highD 分支已实现 highD 格式 CSV 读取**（`*_tracks.csv` / `*_recordingMeta.csv` / `*_tracksMeta.csv`，支持按时间戳取帧和窗口切片）；INTERACTION / NGSIM 仍是接口骨架。以下数据集是后续迭代计划接入的目标，不应在参赛材料中表述为“已用于标定”。
 
 ### 2.1 计划接入的真实道路数据集
 
 | 数据集 | 来源与特征 | 计划用途 | 当前状态 |
 | :--- | :--- | :--- | :--- |
-| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为回放场景 | 接口预留，未接入数据 |
+| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为回放场景 | ✅ CSV 解析器已实现；未附带数据、未标定 |
 | **INTERACTION** | 伯克利等联合发布，含环岛、无保护路口、匝道并线等强交互场景 | 博弈决策的对抗场景与评测基准 | 接口预留，未接入数据 |
 | **NGSIM** | 美国 FHWA 的 US-101 / I-80 高密度轨迹 | 大流量交通流重放与极限合流测试 | 接口预留，未接入数据 |
+
+highD 数据需自行从官方渠道下载并放到 `data/raw/highD/`（该目录已被 `.gitignore` 忽略）。典型用法：
+
+```python
+from src.environment.dataset_loader import HighDDatasetLoader
+
+loader = HighDDatasetLoader("data/raw/highD")
+meta = loader.load_scenario("data/raw/highD/01_tracks.csv")
+obstacles = loader.get_frame_obstacles(1.0)          # 相对时间 1.0 s 的最近帧
+window = loader.extract_window(0.0, 10.0, ego_id=123, radius=80.0)
+```
+
+> 解析器保留 highD 原始 x/y 坐标，不做重定心/旋转；`height` 视为车身长度。把 highD 轨迹接入 `RoadNetwork` 前仍需做坐标对齐与场景切片选择。
 
 **当前实验数据来源**：`configs/scenarios/*.yaml` 中的**人工构造合成场景**（高速汇入、前方静止车辆）。这些场景用于验证闭环链路与指标计算是否正确，不代表真实交通流分布。
 

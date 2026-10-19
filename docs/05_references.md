@@ -18,11 +18,11 @@ intelligent-vehicle-simulation/
 │   └── 05_references.md        # 权威学术参考文献与国际行业标准规范
 ├── src/                        # 核心仿真引擎与高保真算法接口实现
 │   ├── common/                 # 车辆状态、Frenet双向映射、OBB几何碰撞检测
-│   ├── environment/            # 道路网络、场景加载、IDM 跟驰；MOBIL/真实数据为接口预留
+│   ├── environment/            # 道路网络、场景加载、IDM 跟驰、highD CSV 解析；MOBIL/INTERACTION 预留
 │   │   ├── road_network.py     # 车道拓扑与真实 s/theta/kappa 参考线
 │   │   ├── scenario_loader.py  # YAML/JSON 场景 -> 路网/障碍物/自车
 │   │   ├── obstacle_manager.py # IDM 步进与预测轨迹
-│   │   └── dataset_loader.py   # highD/INTERACTION/NGSIM 接口骨架（未接入数据）
+│   │   └── dataset_loader.py   # highD 格式 CSV 解析；INTERACTION/NGSIM 为接口（未附带数据）
 │   ├── vehicle_model/          # 运动学、2-DOF 线性轮胎、传感器模型；Pacejka 预留
 │   ├── decision/               # 分层有限状态机 (HFSM) 与收益矩阵博弈决策
 │   ├── planning/               # Frenet Lattice + OBB 碰撞校验；EM/QP 预留
@@ -48,7 +48,7 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 当前 15 项测试
+# 当前 28 项测试
 python3 -m unittest discover tests -v
 
 # 闭环仿真 + KPI

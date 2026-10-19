@@ -17,10 +17,21 @@ from src.simulator import SimulationEngine
 
 
 def build_decision_maker(scenario: Scenario, decision: str) -> BaseDecisionMaker:
+    vp = scenario.vehicle_params
+    ego_length = float(vp.get("length", 4.8))
+    ego_width = float(vp.get("width", 1.9))
     if decision == "game":
-        return GameTheoreticDecisionMaker(road_network=scenario.road_network)
+        return GameTheoreticDecisionMaker(
+            road_network=scenario.road_network,
+            ego_length=ego_length,
+            ego_width=ego_width,
+        )
     if decision == "fsm":
-        return HierarchicalFSMDecisionMaker(road_network=scenario.road_network)
+        return HierarchicalFSMDecisionMaker(
+            road_network=scenario.road_network,
+            ego_length=ego_length,
+            ego_width=ego_width,
+        )
     raise ValueError(f"Unknown decision type: {decision}")
 
 

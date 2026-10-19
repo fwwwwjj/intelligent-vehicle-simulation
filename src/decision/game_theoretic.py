@@ -32,12 +32,16 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
         weight_comfort: float = 0.2,
         desired_speed: float = 22.22,
         road_network: Optional["RoadNetwork"] = None,
+        ego_length: float = 4.8,
+        ego_width: float = 1.9,
     ):
         self.w_s = weight_safety
         self.w_e = weight_efficiency
         self.w_c = weight_comfort
         self.desired_speed = desired_speed
         self.road_network = road_network
+        self.ego_length = float(ego_length)
+        self.ego_width = float(ego_width)
 
     # ------------------------------------------------------------------
     # 收益函数
@@ -98,9 +102,9 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
             if dx <= 0:
                 continue
             lateral = abs(obs.y - center_y) if center_y is not None else abs(obs.y - ego_state.y)
-            if lateral > 0.5 * (1.9 + obs.width) + 0.4:
+            if lateral > 0.5 * (self.ego_width + obs.width) + 0.4:
                 continue
-            gap = dx - 0.5 * (4.8 + obs.length)
+            gap = dx - 0.5 * (self.ego_length + obs.length)
             if gap < min_gap:
                 min_gap = gap
                 lead = obs
@@ -117,9 +121,9 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
             if dx <= 0:
                 continue
             lateral = abs(obs.y - center_y) if center_y is not None else abs(obs.y - ego_state.y)
-            if lateral > 0.5 * (1.9 + obs.width) + 0.4:
+            if lateral > 0.5 * (self.ego_width + obs.width) + 0.4:
                 continue
-            gap = dx - 0.5 * (4.8 + obs.length)
+            gap = dx - 0.5 * (self.ego_length + obs.length)
             if gap < min_gap:
                 min_gap = gap
                 follower = obs
