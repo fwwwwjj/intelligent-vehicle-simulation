@@ -126,7 +126,7 @@ python3 scripts/run_simulation.py --scenario highway_merge --decision game --dur
 python3 -m unittest discover tests -v
 ```
 
-当前共 28 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、seed 复现与闭环速度跟踪。
+当前共 30 项测试，覆盖坐标变换、OBB、运动学/动力学、LQR/PID、真实参考线规划、碰撞指标、highD CSV 解析、seed 复现、闭环速度跟踪及 IDM 障碍物预测。
 
 > 开发期建议只跑上述单元测试（约 3 s）。多 seed `run_benchmark.py`、可视化渲染与图表导出会持续占用 CPU，建议在空闲时段单独运行，避免与日常编码并行导致机器过热。
 
@@ -139,19 +139,11 @@ python3 scripts/export_results.py --scenario highway_merge --decision fsm --dura
 
 ## 六、 仿真演示与实验对比
 
-> 以下为当前代码在内置场景、`seed=42`、20 s 下的实测结果，由 `scripts/run_benchmark.py` 生成，原始数据保存在 `results/benchmark.json` / `results/benchmark.csv`。单 seed 仅用于冒烟验证，不宣称统计显著性。
+当前仓库没有随附 `results/benchmark.json` / `results/benchmark.csv` 原始输出，因此旧版列出的具体数值无法在此检出版本中追溯，本版不保留这些实验数字。可用以下命令重新生成本地结果；单 seed 只用于冒烟验证，不代表统计显著性：
 
-| 场景 | 决策 | 成功率 | 最小 OBB 净距 | 最小 TTC | RMS Jerk | 平均横向误差 | 平均规划时延 |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `highway_merge` | FSM | 1.00 | 1.85 m | 20.42 s | 2.007 m/s³ | 0.003 m | 8.17 ms |
-| `highway_merge` | Game | 1.00 | 1.85 m | 20.42 s | 2.007 m/s³ | 0.003 m | 8.24 ms |
-| `emergency_avoidance` | FSM | 1.00 | 13.99 m | 2.37 s | 1.804 m/s³ | 0.000 m | 8.72 ms |
-| `emergency_avoidance` | Game | 1.00 | 15.33 m | 2.37 s | 1.750 m/s³ | 0.000 m | 8.59 ms |
-
-说明：
-- `highway_merge` 中 FSM 与 Game 都选择在主线后车通过后汇入，轨迹与速度剖面接近，因此指标相同；这不是“两套算法完全等价”，而是该单场景尚未拉开决策差异。
-- `emergency_avoidance` 中 Game 的停车点比 FSM 远约 1.3 m，Jerk 低约 3%，但样本很小，不能据此下强结论。
-- 早期 README/docs 中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字没有代码或实验日志支撑，已移除，避免评审现场无法复现。
+```bash
+python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance --decisions fsm game --seeds 42 --duration 20
+```
 
 ---
 

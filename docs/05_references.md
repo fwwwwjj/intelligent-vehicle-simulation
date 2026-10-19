@@ -48,7 +48,7 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 当前 28 项测试
+# 当前 30 项测试
 python3 -m unittest discover tests -v
 
 # 闭环仿真 + KPI

@@ -204,7 +204,7 @@ sequenceDiagram
 
 ### 2. `src/environment/` (环境层)
 - **职责**：管理道路几何拓扑（`RoadNetwork`）、场景装载（`scenario_loader.py`）、真实交通数据集解析（`BaseDatasetLoader`）与多车动态微观演化（`ObstacleManager`）；
-- **当前实现**：IDM 跟驰已进入 `ObstacleManager.step()`；MOBIL 换道判定公式已保留，但尚未接入换道状态机；highD 格式 CSV 解析器已实现（`HighDDatasetLoader`），但仓库未附带数据、未完成 IDM 标定；INTERACTION/NGSIM 仍为接口骨架。
+- **当前实现**：IDM 跟驰已进入 `ObstacleManager.step()`，背景车预测使用最近一次计算的纵向加速度作恒加速度外推并在零速处停止；MOBIL 换道判定公式已保留，但尚未接入换道状态机；highD 格式 CSV 解析器已实现（`HighDDatasetLoader`），但仓库未附带数据、未完成 IDM 标定；INTERACTION/NGSIM 仍为接口骨架。
 - **扩展规范**：若新增数据集解析器（如 Waymo 或 nuScenes），必须继承 `BaseDatasetLoader` 并实现 `load_scenario()` 与 `get_frame_obstacles()`。
 
 ### 3. `src/vehicle_model/` (物理机理层)
@@ -244,7 +244,7 @@ sequenceDiagram
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
 3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
-4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 28 项）。
+4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过（当前 30 项）。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
 6. 【未实现接口必须显式失败】：EM/QP、MPC 等尚未实现的算法，调用入口必须抛出 NotImplementedError，禁止返回空 Trajectory / 零控制量冒充有效输出。
 7. 【结果由脚本生成】：KPI 表、曲线与对比数字必须由 scripts/ 下的运行/评测脚本生成；单 seed 结果必须标注，禁止手填或复制旧文档数字。

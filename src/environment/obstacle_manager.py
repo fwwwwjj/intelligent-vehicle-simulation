@@ -5,7 +5,8 @@
 2. 协同换道模型 (MOBIL, Minimizing Overall Braking Induced by Lane change) ——
    仅保留判定公式，尚未接入换道状态机。
 
-当前 ``step()`` 对注册了 IDM 的车辆做跟驰更新，其余车辆保持匀速。
+当前 ``step()`` 对注册了 IDM 的车辆做跟驰更新，其余车辆保持匀速。预测轨迹使用
+最近一次计算的纵向加速度作恒加速度外推，并在预测速度到零时截断位置。
 """
 
 from typing import List, Dict, Optional
@@ -87,6 +88,7 @@ class ObstacleManager:
     def __init__(self):
         self.obstacles: Dict[str, ObstacleState] = {}
         self.idm_models: Dict[str, IntelligentDriverModel] = {}
+        self._last_accelerations: Dict[str, float] = {}
         self.mobil_model = MOBILLaneChangeModel()
 
     def add_obstacle(self, obstacle: ObstacleState, idm: Optional[IntelligentDriverModel] = None) -> None:
@@ -139,6 +141,7 @@ class ObstacleManager:
 
         for obs_id, obs in self.obstacles.items():
             accel = accelerations.get(obs_id, 0.0)
+            self._last_accelerations[obs_id] = accel
             obs.vx = float(max(0.0, obs.vx + accel * dt))
             if abs(obs.vx) > 1e-6 or abs(obs.vy) > 1e-6:
                 obs.heading = float(np.arctan2(obs.vy, obs.vx))
@@ -148,7 +151,8 @@ class ObstacleManager:
 
     def generate_predicted_trajectory(self, obstacle_id: str, horizon: float = 5.0, dt: float = 0.2) -> List[TrajectoryPoint]:
         """
-        为指定障碍物生成未来预测时空轨迹 (包含恒定速度/加速度预测)
+        为指定障碍物生成未来预测时空轨迹：纵向用最近一次 IDM 加速度作恒加速度外推，
+        横向保持恒速；纵向预测速度降到零后位置不再前进。
         :param obstacle_id: 目标障碍物ID
         :param horizon: 预测时域 (s)
         :param dt: 预测采样步长 (s)
@@ -158,13 +162,34 @@ class ObstacleManager:
         pred_pts = []
         steps = int(horizon / dt)
         cur_x, cur_y = obs.x, obs.y
+        longitudinal_accel = self._last_accelerations.get(obstacle_id, 0.0)
+        initial_vx = max(0.0, obs.vx)
+        stop_distance = (
+            initial_vx ** 2 / (-2.0 * longitudinal_accel)
+            if longitudinal_accel < 0.0 else float("inf")
+        )
+        stop_time = (
+            initial_vx / (-longitudinal_accel)
+            if longitudinal_accel < 0.0 else float("inf")
+        )
         for i in range(steps):
             t = (i + 1) * dt
+            predicted_vx = max(0.0, initial_vx + longitudinal_accel * t)
+            if t >= stop_time:
+                longitudinal_displacement = stop_distance
+            else:
+                longitudinal_displacement = max(
+                    0.0, initial_vx * t + 0.5 * longitudinal_accel * t ** 2
+                )
             pred_pts.append(TrajectoryPoint(
-                x=float(cur_x + obs.vx * t),
+                x=float(cur_x + longitudinal_displacement),
                 y=float(cur_y + obs.vy * t),
-                theta=float(obs.heading),
-                v=float(np.hypot(obs.vx, obs.vy)),
+                theta=(
+                    float(np.arctan2(obs.vy, predicted_vx))
+                    if predicted_vx > 1e-9 or abs(obs.vy) > 1e-9
+                    else float(obs.heading)
+                ),
+                v=float(np.hypot(predicted_vx, obs.vy)),
                 t=float(t)
             ))
         obs.predicted_trajectory = pred_pts

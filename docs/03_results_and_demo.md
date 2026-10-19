@@ -33,25 +33,13 @@
 
 ## 3. 当前实测结果
 
-实验设置：`seed=42`，仿真步长 0.05 s，时长 20 s，共 400 个控制周期；由 `python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance --decisions fsm game --seeds 42 --duration 20` 生成，原始数据在 `results/benchmark.json` / `results/benchmark.csv`。
+仓库当前没有随附 `results/benchmark.json` / `results/benchmark.csv` 原始输出，因此此前列出的数值无法从本次检出的仓库版本追溯，本版不保留该结果表。复现实验命令如下，执行后会在本地 `results/` 目录写入输出：
 
-| 场景 | 决策 | 成功率 | 最小 OBB 净距 | 最小 TTC | RMS Jerk | 平均横向误差 | 平均规划时延 |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `highway_merge` | FSM | 1.00 | 1.85 m | 20.42 s | 2.007 m/s³ | 0.003 m | 8.17 ms |
-| `highway_merge` | Game | 1.00 | 1.85 m | 20.42 s | 2.007 m/s³ | 0.003 m | 8.24 ms |
-| `emergency_avoidance` | FSM | 1.00 | 13.99 m | 2.37 s | 1.804 m/s³ | 0.000 m | 8.72 ms |
-| `emergency_avoidance` | Game | 1.00 | 15.33 m | 2.37 s | 1.750 m/s³ | 0.000 m | 8.59 ms |
+```bash
+python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance --decisions fsm game --seeds 42 --duration 20
+```
 
-**结果解读：**
-
-1. 两个场景均无碰撞，最小 OBB 净距为正；`emergency_avoidance` 中主车在静止车辆前停住并保持，说明“决策目标速度 → 规划减速剖面 → 控制制动”链路已经打通。
-2. `highway_merge` 中 FSM 与 Game 都等到主线后车通过后再汇入，速度剖面接近，因此指标相同。这说明当前单场景还不足以拉开两种决策器的差异，不能据此宣称“博弈决策显著优于 FSM”。
-3. `emergency_avoidance` 中 Game 的停车点比 FSM 远约 1.3 m，RMS Jerk 低约 3%；差异存在但样本只有 1 个 seed，不能作为统计结论。
-4. `highway_merge` 的最小 TTC 为 20.42 s，表示全程没有形成明显接近趋势；这不是“TTC 越大越好”的绝对指标，需要结合场景理解。
-
-**与早期文档的差异：**
-
-早期 README/docs/03 中的 99.2%、82.5%、4.6 m、0.86 m/s³、12.5 ms 等数字**没有对应的代码路径或实验日志**，无法由当前仓库复现。本版已将结果表替换为上述可复现实验，并在 README 中保留“当前实现边界”。
+运行后应依据生成的 JSON/CSV 更新本节结果。单 seed 只适用于冒烟验证，不能作为统计结论。
 
 ---
 
