@@ -25,7 +25,7 @@ from src.vehicle_model.dynamics import DynamicBicycleModel
 from src.vehicle_model.sensor_model import SensorModel
 from src.decision.base_decision import BaseDecisionMaker, DecisionOutput
 from src.planning.base_planner import BasePlanner
-from src.control.base_controller import BaseController
+from src.control.base_controller import BaseController, ControlCommand
 from src.evaluation.metrics import PerformanceEvaluator, SimulationMetricsRecord
 
 
@@ -217,6 +217,41 @@ class SimulationEngine:
 
         return float(min_distance), float(min_ttc), collision_count
 
+    def _is_planner_fallback(self, planned_trajectory: Optional[Trajectory]) -> bool:
+        """
+        判断当前步规划器是否进入回退逻辑。
+        - EM 规划器：若路径 QP 或速度 QP 任一求解失败（或使用兜底），则判定为规划回退；
+        - 空轨迹：无论何种规划器，若未能产出有效轨迹点，判定为规划回退；
+        - Lattice 规划器：基于采样的确定性多项式筛选，无 QP 求解回退机制，有轨迹时稳定判定为 False。
+        """
+        if planned_trajectory is None or not planned_trajectory.points:
+            return True
+        if hasattr(self.planner, "last_path_result") or hasattr(self.planner, "last_speed_result"):
+            path_res = getattr(self.planner, "last_path_result", None)
+            speed_res = getattr(self.planner, "last_speed_result", None)
+            if path_res is None or speed_res is None:
+                return True
+            if not getattr(path_res, "success", False) or not getattr(speed_res, "success", False):
+                return True
+            if str(getattr(path_res, "note", "")).startswith("fallback") or str(getattr(speed_res, "note", "")).startswith("fallback"):
+                return True
+        return False
+
+    def _is_controller_fallback(self, control_cmd: Optional[ControlCommand]) -> bool:
+        """
+        判断当前步控制器是否进入回退逻辑。
+        - MPC 控制器：若未求解、空轨迹、或 ADMM-QP 求解失败进入 PD/P 兜底，判定为控制回退；
+        - LQR 控制器：基于代数黎卡提方程解析求解，无 QP 迭代失败回退机制，稳定判定为 False。
+        """
+        if hasattr(self.controller, "last_solve_info"):
+            solve_info = getattr(self.controller, "last_solve_info", None)
+            if not isinstance(solve_info, dict) or not solve_info:
+                return True
+            if solve_info.get("status") == "empty_trajectory":
+                return True
+            return not bool(solve_info.get("success", False))
+        return False
+
     # ------------------------------------------------------------------
     # 单步闭环
     # ------------------------------------------------------------------
@@ -279,9 +314,11 @@ class SimulationEngine:
         if lane_id is not None:
             self.current_lane_id = lane_id
 
-        # 8. 真实 KPI 计算
+        # 8. 真实 KPI 计算与回退诊断
         lateral_error, heading_error = self._tracking_errors(planned_trajectory, reference_line)
         min_distance, min_ttc, collision_count = self._safety_metrics(ground_truth_obstacles)
+        planner_fallback = self._is_planner_fallback(planned_trajectory)
+        controller_fallback = self._is_controller_fallback(control_cmd)
 
         dx = self.ego_state.x - self._prev_x
         dy = self.ego_state.y - self._prev_y
@@ -308,6 +345,8 @@ class SimulationEngine:
             control_latency_ms=float(control_latency_ms),
             distance_traveled=float(self._distance_traveled),
             collision_count=int(collision_count),
+            planner_fallback=planner_fallback,
+            controller_fallback=controller_fallback,
         )
         self.evaluator.record_step(record)
 

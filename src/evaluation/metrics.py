@@ -31,6 +31,8 @@ class SimulationMetricsRecord:
     control_latency_ms: float = 0.0
     distance_traveled: float = 0.0
     collision_count: int = 0
+    planner_fallback: bool = False
+    controller_fallback: bool = False
 
 
 class PerformanceEvaluator:
@@ -68,8 +70,10 @@ class PerformanceEvaluator:
         # collision_frames 是“发生碰撞的帧数”（可能一帧多车只计一次）。
         collision_obstacle_count = sum(r.collision_count for r in self.records)
         collision_frame_count = sum(1 for r in self.records if r.is_collision)
+        planner_fallbacks = sum(1 for r in self.records if r.planner_fallback)
+        controller_fallbacks = sum(1 for r in self.records if r.controller_fallback)
 
-        return {
+        report = {
             "success_rate": 0.0 if collision_obstacle_count > 0 else 1.0,
             "collision_count": float(collision_obstacle_count),
             "collision_frames": float(collision_frame_count),
@@ -78,7 +82,8 @@ class PerformanceEvaluator:
             "min_ttc_s": float(np.min(ttcs)) if ttcs else 999.0,
             "rms_jerk_m_s3": float(np.sqrt(np.mean(np.square(jerks)))),
             "max_accel_m_s2": float(np.max(accels)),
-            "max_decel_m_s2": float(np.min(accels)),
+            "max_decel_m_s2": float(np.min(accels)),  # 最小纵向加速度（负值表示制动；未制动时可能为正）
+            "min_accel_m_s2": float(np.min(accels)),
             "max_lateral_accel_m_s2": float(np.max(lateral_accels)),
             "mean_lateral_error_m": float(np.mean(lat_errors)),
             "max_lateral_error_m": float(np.max(lat_errors)),
@@ -87,6 +92,19 @@ class PerformanceEvaluator:
             "max_planning_latency_ms": float(np.max(latencies)),
             "avg_decision_latency_ms": float(np.mean(decision_latencies)),
             "avg_control_latency_ms": float(np.mean(control_latencies)),
+            "max_control_latency_ms": float(np.max(control_latencies)),
+            "planner_fallback_count": float(planner_fallbacks),
+            "planner_fallback_rate": float(planner_fallbacks / len(self.records)),
+            "controller_fallback_count": float(controller_fallbacks),
+            "controller_fallback_rate": float(controller_fallbacks / len(self.records)),
             "distance_traveled_m": float(self.records[-1].distance_traveled),
             "duration_s": float(self.records[-1].timestamp),
         }
+
+        # 统计学有效性约束：p95 至少需要 20 个样本 (1 / (1 - 0.95)) 才有分位数意义；
+        # 仅在样本数充裕时输出，避免微型冒烟测试中产生失真统计量
+        if len(self.records) >= 20:
+            report["p95_planning_latency_ms"] = float(np.percentile(latencies, 95))
+            report["p95_control_latency_ms"] = float(np.percentile(control_latencies, 95))
+
+        return report

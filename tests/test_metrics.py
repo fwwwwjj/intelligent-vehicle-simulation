@@ -15,6 +15,10 @@ import numpy as np
 
 from src.evaluation.metrics import PerformanceEvaluator, SimulationMetricsRecord
 from src.evaluation.benchmark import BenchmarkSuite
+from src.environment.scenario_loader import load_named_scenario
+from src.runner import build_engine
+from src.common.qp import QPSolution
+from unittest.mock import patch
 
 
 def _record(
@@ -134,6 +138,84 @@ class TestBenchmarkSummary(unittest.TestCase):
                 self.assertEqual(len(list(csv.DictReader(fh))), 1)
             with open(summary_csv, encoding="utf-8", newline="") as fh:
                 self.assertEqual(len(list(csv.DictReader(fh))), 1)
+
+
+class TestFallbackMetrics(unittest.TestCase):
+    def test_lattice_lqr_normal_has_zero_fallback(self):
+        scenario = load_named_scenario("highway_merge")
+        engine = build_engine(
+            scenario,
+            decision="fsm",
+            planner="lattice",
+            controller="lqr",
+            enable_visualization=False,
+        )
+        for _ in range(5):
+            engine.step()
+        report = engine.evaluator.compute_summary_report()
+        self.assertEqual(report["planner_fallback_count"], 0.0)
+        self.assertEqual(report["planner_fallback_rate"], 0.0)
+        self.assertEqual(report["controller_fallback_count"], 0.0)
+        self.assertEqual(report["controller_fallback_rate"], 0.0)
+
+    def test_em_planner_qp_failure_triggers_planner_fallback(self):
+        scenario = load_named_scenario("highway_merge")
+        engine = build_engine(
+            scenario,
+            decision="fsm",
+            planner="em",
+            controller="lqr",
+            enable_visualization=False,
+        )
+        failed_sol = QPSolution(
+            x=np.zeros(1),
+            success=False,
+            iterations=0,
+            primal_residual=1.0,
+            dual_residual=1.0,
+            objective=float("inf"),
+            constraint_violation=1.0,
+            status="infeasible",
+        )
+        with patch("src.planning.em_planner.solve_qp", return_value=failed_sol):
+            for _ in range(5):
+                engine.step()
+        report = engine.evaluator.compute_summary_report()
+        self.assertGreater(report["planner_fallback_count"], 0.0)
+        self.assertGreater(report["planner_fallback_rate"], 0.0)
+        self.assertEqual(report["controller_fallback_count"], 0.0)
+
+    def test_mpc_controller_qp_failure_triggers_controller_fallback(self):
+        scenario = load_named_scenario("highway_merge")
+        engine = build_engine(
+            scenario,
+            decision="fsm",
+            planner="lattice",
+            controller="mpc",
+            enable_visualization=False,
+        )
+        # 将 MPC 的 QP 最大迭代步数设为 0，迫使 ADMM QP 求解失败进入回退
+        engine.controller.qp_max_iter = 0
+        for _ in range(5):
+            engine.step()
+        report = engine.evaluator.compute_summary_report()
+        self.assertEqual(report["planner_fallback_count"], 0.0)
+        self.assertGreater(report["controller_fallback_count"], 0.0)
+        self.assertGreater(report["controller_fallback_rate"], 0.0)
+
+    def test_p95_latency_only_present_when_samples_sufficient(self):
+        evaluator = PerformanceEvaluator()
+        for i in range(10):
+            evaluator.record_step(_record(0.05 * (i + 1)))
+        rep10 = evaluator.compute_summary_report()
+        self.assertNotIn("p95_planning_latency_ms", rep10)
+        self.assertNotIn("p95_control_latency_ms", rep10)
+
+        for i in range(10, 25):
+            evaluator.record_step(_record(0.05 * (i + 1)))
+        rep25 = evaluator.compute_summary_report()
+        self.assertIn("p95_planning_latency_ms", rep25)
+        self.assertIn("p95_control_latency_ms", rep25)
 
 
 if __name__ == "__main__":

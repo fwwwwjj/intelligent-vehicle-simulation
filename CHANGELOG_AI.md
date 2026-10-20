@@ -1,5 +1,15 @@
 # AI 修改记录
 
+## 2026-10-20 (修复回退诊断指标与 P95 时延口径)
+
+- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`tests/test_metrics.py`、`docs/06_qp_mpc_em_pacejka.md`、`AI_SYSTEM_SPEC.md`、`CHANGELOG_AI.md`。
+- **修改内容**：
+  1. 在 `SimulationEngine.step()` 中从规划器（`EMPlanner.last_path_result` / `last_speed_result`）与控制器（`MPCController.last_solve_info`）读取真实求解与回退状态，向 `SimulationMetricsRecord` 填写真实的 `planner_fallback` 与 `controller_fallback`；
+  2. 明确回退口径：EM 路径/速度 QP 未成功或空轨迹记为规划回退，Lattice 稳定记为 False；MPC QP 未成功或空轨迹记为控制回退，LQR 稳定记为 False；
+  3. `PerformanceEvaluator` 中将 p95 时延统计限定在样本数 $\ge 20$ 时输出，避免微型样本产生失真分位数；
+  4. 新增 4 项单元测试验证正常场景 0 回退、EM 失败回退计数、MPC 失败回退计数及 p95 样本阈值条件。
+- **验证方式及结果**：`python3 -B -m unittest discover tests` 65 项全绿通过；CLI 执行 `scripts/run_simulation.py --controller mpc --duration 5 --no_vis` 正常场景回退率 0，QP 迭代设 0 时回退率 100%。
+
 ## 2026-10-19 (QP/MPC/EM/Pacejka 主回路 + 远端 MOBIL/标定整合)
 
 - **修改文件**：`src/common/qp.py`、`src/control/mpc_controller.py`、`src/planning/em_planner.py`、`src/vehicle_model/tire.py`、`src/vehicle_model/dynamics.py`、`src/runner.py`、`src/simulator.py`、`src/environment/scenario_loader.py`、`configs/default_config.yaml`、`scripts/run_simulation.py`、`scripts/run_benchmark.py`、`docs/06_qp_mpc_em_pacejka.md`、新增 5 个测试文件及相关文档。

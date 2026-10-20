@@ -283,6 +283,12 @@ CLI 优先级：显式参数 > 场景 YAML/内置配置 > 默认值。
 `--planner / --controller / --tire / --dynamic`，结果 JSON/CSV 会记录算法字段，便于做
 Lattice vs EM、LQR vs MPC、Linear vs Pacejka 的 A/B。
 
+### 6.4 求解诊断与回退率监控指标
+
+- `planner_fallback_count` / `planner_fallback_rate`：监测 EM 规划器是否因 Path QP 或 Speed QP 求解未收敛而使用几何平滑兜底，或输出空轨迹；Lattice 规划器无 QP 路径，正常规划时稳定报告 0；
+- `controller_fallback_count` / `controller_fallback_rate`：监测 MPC 控制器是否因 ADMM-QP 求解失败或空轨迹输入而退化为 PD+P 兜底；LQR 控制器无 QP 路径，稳定报告 0；
+- `p95_planning_latency_ms` / `p95_control_latency_ms`：仅在仿真采样步数 $\ge 20$ 时输出 95 分位数，避免小样本失真。
+
 ---
 
 ## 7. 验证

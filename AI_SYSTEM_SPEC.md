@@ -310,7 +310,8 @@ sequenceDiagram
 - **Jerk**：实际加速度差分 `Δa/Δt`，不是轨迹理论值。
 - **横向误差**：自车到规划轨迹最近点的 cross-track 误差。
 - **时延**：决策、规划、控制分别计时，禁止合并成一个 `planning_latency_ms`。
-- **QP 诊断**：MPC 用 `last_solve_info`（status/success/iterations/residual/violation），EM 用 `last_path_result` / `last_speed_result`（success/iterations/constraint_violation/note）记录求解质量；回退次数与最大时延必须单独报告。
+- **QP 诊断与回退**：MPC 用 `last_solve_info`（status/success/iterations/residual/violation），EM 用 `last_path_result` / `last_speed_result`（success/iterations/constraint_violation/note）记录求解质量；`planner_fallback` 由 EM 路径/速度 QP 成功标志判定（任一失败或空轨迹置 True；Lattice 恒为 False）；`controller_fallback` 由 MPC QP 成功标志判定（失败或空轨迹置 True；LQR 恒为 False）；汇总报告回退次数与比率。
+- **P95 时延**：`p95_planning_latency_ms` 与 `p95_control_latency_ms` 仅在有效仿真帧数 $\ge 20$ 时输出，避免微型测试产生失真分位数。
 - **碰撞计数**：`collision_count` 为逐帧碰撞障碍物数量之和；`collision_frames` 为发生碰撞的帧数；单次 `success_rate` 是 0/1 结果。批量汇总中的 `success_rate_mean` 是逐次二值结果的均值，并给出 Wilson 95% 区间；其他数值指标报告均值与样本标准差（单样本标准差记 0）。
 - **长度口径**：`TrajectoryPoint.s` 是参考线站距，不是实际路径弧长；大横向偏移时两者有差异。
 
