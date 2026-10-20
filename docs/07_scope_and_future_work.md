@@ -55,7 +55,7 @@
 | Pacejka `tire.py` | 稳态魔术公式 + 载荷转移 | 未做试验标定；与线性轮胎差异未统计 | 轮胎试验数据标定；与 2-DOF 主回路联调 |
 | 交叉口 `intersection_unprotected` | 拓扑/场景存在；车辆会冲过路口并驶出道路 | 任务不完成；决策层用中位数 y，看不到对向冲突车 | 局部 Frenet 车道查询；冲突点/路权；曲率限速 |
 | MOBIL 换道 | 已接入 `ObstacleManager.step()`，高速汇入启用 | 未做换道安全性统计 | 多场景换道安全/舒适统计 |
-| highD 真实标定 | **最小可信版脚本已提供**：跟驰样本提取 + IDM 标定 + 开环回放；仍缺真实数据运行结果 | 无真实数据、无本机标定结果 | 下载 highD 子集并运行 `scripts/calibrate_highd.py` / `replay_highd.py`；全量生产标定仍未来工作 |
+| highD 真实标定 | **highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补**：跟驰样本提取 + IDM 标定 + 开环回放脚本已提供 | 无真实数据运行结果 | 下载 highD 子集并运行 `scripts/calibrate_highd.py` / `replay_highd.py`；全量生产标定仍未来工作 |
 | OpenSCENARIO/ROS/CARLA | 占位/路线图 | 无中间件代码 | 后续工程化 |
 
 > 这些模块的代码不删除：保留接口、单元测试和切换开关，方便未来继续做；但论文/答辩中必须写成“未来工作/探索性原型”，不能写成“已完成并验证”。

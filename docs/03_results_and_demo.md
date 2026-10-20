@@ -127,7 +127,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 ## 5. 当前局限
 
 - **样本量**：15 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
-- **场景多样性**：三个核心场景都是结构化道路/合成交通；尚无真实 highD 轨迹回放。
+- **场景多样性**：三个核心场景都是结构化道路/合成交通；highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补。
 - **车辆模型**：核心链路使用运动学自行车模型，不能体现轮胎侧滑/极限工况；2-DOF + Pacejka 属于未来工作。
 - **控制**：LQR 的横向加速度已限制在 2.5 m/s² 附近；但高速换道的舒适性仍有优化空间。
 - **规划**：Lattice 只做单时域采样；EM/QP 属于未来工作。
@@ -154,7 +154,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 ## 7. 真实 highD 最小可信版（数据可信度附录）
 
-当前 3.2 的主结果是合成场景闭环。为了提高数据可信度，仓库另外提供 **highD 最小可信版**：
+当前 3.2 的主结果是合成场景闭环。**highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补**。仓库另外提供 **highD 最小可信版**：
 
 - `scripts/calibrate_highd.py`：从 highD 同车道跟驰片段提取样本，标定 IDM 的 `v0, s0, T, a_max, b_desired`，输出训练/验证 RMSE；
 - `scripts/replay_highd.py`：把一段真实 highD 轨迹按时间回放成 BEV 截图/GIF，检查坐标、车道映射与加载链路；

@@ -16,13 +16,13 @@
 
 ## 2. 数据来源与当前接入状态
 
-> **必须如实说明**：当前仓库**没有随附** highD / INTERACTION / NGSIM 的原始数据文件，也没有完成基于真实轨迹的参数标定。`src/environment/dataset_loader.py` 的 **highD 分支已实现 highD 格式 CSV 读取**（`*_tracks.csv` / `*_recordingMeta.csv` / `*_tracksMeta.csv`，支持按时间戳取帧和窗口切片）；INTERACTION / NGSIM 仍是接口骨架。以下数据集是后续迭代计划接入的目标，不应在参赛材料中表述为“已用于标定”。
+> **必须如实说明**：当前仓库**没有随附** highD / INTERACTION / NGSIM 的原始数据文件。**highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补**。`src/environment/dataset_loader.py` 的 **highD 分支已实现 highD 格式 CSV 读取**（`*_tracks.csv` / `*_recordingMeta.csv` / `*_tracksMeta.csv`，支持按时间戳取帧和窗口切片）；INTERACTION / NGSIM 仍是接口骨架。以下数据集是后续迭代计划接入的目标，不应在参赛材料中表述为“已用于标定”。
 
 ### 2.1 计划接入的真实道路数据集
 
 | 数据集 | 来源与特征 | 计划用途 | 当前状态 |
 | :--- | :--- | :--- | :--- |
-| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为开环回放 | ⚠️ CSV 解析器 + 最小可信版标定/回放脚本已实现；真实数据未随附，未在本机运行真实标定 |
+| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为开环回放 | ⚠️ highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补 |
 | **INTERACTION** | 伯克利等联合发布，含环岛、无保护路口、匝道并线等强交互场景 | 博弈决策的对抗场景与评测基准 | 接口预留，未接入数据 |
 | **NGSIM** | 美国 FHWA 的 US-101 / I-80 高密度轨迹 | 大流量交通流重放与极限合流测试 | 接口预留，未接入数据 |
 

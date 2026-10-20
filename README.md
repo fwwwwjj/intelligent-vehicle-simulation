@@ -130,7 +130,7 @@ intelligent-vehicle-simulation/
 | LTV-MPC | 线性化误差模型 + QP；紧急制动会撞车 | 修 emergency stop；与 LQR 对比 |
 | Pacejka | 稳态魔术公式原型 | 轮胎试验标定；与线性轮胎对比 |
 | 城市无保护路口 | 拓扑存在；车辆会驶出道路 | 局部 Frenet、冲突点/路权、曲率限速 |
-| highD 真实标定 | 格式解析器 + 合成样例 | 下载真实子集、标定、回放 |
+| highD 真实标定 | highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补 | 下载真实 recording 运行脚本；全量生产标定仍未来工作 |
 | OpenSCENARIO/ROS/CARLA | 占位/路线图 | 后续工程化 |
 
 > 论文/答辩中请使用“未来工作/探索性原型”的表述，不要写成“已完成并验证”。
@@ -223,7 +223,7 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
   --start-time 0 --duration 10 --step 0.5 --max-frames 12 --gif
 ```
 
-这是**最小可信版**：只做同车道跟驰标定 + 开环回放，不做闭环交互。`data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，不能写成真实标定。详见 [docs/10_highd_calibration_replay.md](docs/10_highd_calibration_replay.md)。
+当前状态：**highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补**。这是**最小可信版**：只做同车道跟驰标定 + 开环回放，不做闭环交互。`data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，不能写成真实标定。详见 [docs/10_highd_calibration_replay.md](docs/10_highd_calibration_replay.md)。
 
 ---
 
@@ -262,7 +262,7 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 - 博弈决策（Game）——当前高速汇入会长时间礼让，20 s 内未汇入；
 - EM/QP 规划、LTV-MPC、Pacejka 轮胎；
 - 城市无保护路口——当前会驶出道路；
-- 全量 highD 真实标定、INTERACTION/NGSIM；
+- 真实 highD recording 运行、全量生产标定、INTERACTION/NGSIM；
 - OpenSCENARIO/ROS/CARLA 联合仿真；
 - 30–50 seeds 统计、参数扰动、SOTIF 边界场景。
 
