@@ -303,7 +303,7 @@ sequenceDiagram
 | 城市无保护路口 | 拓扑存在；当前会驶出道路 | “无保护左转已实现” |
 | highD / INTERACTION / NGSIM | highD 仅有解析器 + 合成样例；其余接口骨架 | “已接入真实数据/已完成标定” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
-| 大规模多 seed 统计 | 当前核心 10 seeds，属轻量基准 | “统计显著优于基线” |
+| 大规模多 seed 统计 | 当前核心 15 seeds（10 base + 5 batch），属轻量基准 | “统计显著优于基线” |
 
 ### 3. 指标口径
 
@@ -329,7 +329,7 @@ sequenceDiagram
 ### 4. 结果可信度
 
 - 结果表必须由 `scripts/run_benchmark.py` 或 `scripts/run_simulation.py --save_results` 生成；批量基准写出 `benchmark.json`、原始运行 `benchmark.csv` 和分组 `benchmark_summary.csv`；
-- 至少报告 seed、场景、时长、样本数；单 seed/10-seed 结果不得写成统计结论；
+- 至少报告 seed、场景、时长、样本数；单 seed/15-seed 结果不得写成统计结论；
 - 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用；
-- 当前核心结果：3 场景 × FSM × 10 seeds；论文目标 30–50 seeds；
+- 当前核心结果：3 场景 × FSM × 15 seeds（10 base + 5 batch）；论文目标 30–50 seeds；
 - Game/EM/MPC/Pacejka/交叉口的短时冒烟或探索性结果不得写成“统计显著优于 LQR/Lattice/FSM”。

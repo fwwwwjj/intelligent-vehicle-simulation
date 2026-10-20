@@ -42,6 +42,8 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `planner` | string | 核心为 `lattice`；`em` 为未来工作 |
 | `controller` | string | 核心为 `lqr`；`mpc` 为未来工作 |
 | `tire_model` | string | 核心为 `linear`；`pacejka` 为未来工作 |
+| `experimental` | bool | 该次运行是否包含 Game/EM/MPC/Pacejka/交叉口；主结果必须为 false |
+| `experimental_reasons` | list | 实验性模块原因，如 `game_decision`、`em_planner` |
 | `success_rate` | float | **任务级成功率**：完成任务 + 无碰撞 + 不驶出道路；0/1 |
 | `task_success` | float | 与 `success_rate` 同口径的数值字段，便于分组统计 |
 | `task_completed` | float | 是否完成场景目标（`highway_merge` 进入主车道；交叉口进入北向出口） |
@@ -93,3 +95,24 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 - **待补**：CI 自动化、30–50 seeds、真实 highD 标定、图表重新生成；
 - **环境提示**：当前基准环境无 PyYAML，场景走内置 dict；安装 `requirements.txt` 后应重跑，确认 YAML 与内置场景一致；
 - **旧产物**：`archive/2026-10-20_pre_scope/` 中的 `kpi_table.md` 与图片来自旧代码，不得再引用。
+
+---
+
+## 6. highD 最小可信版产物（可选）
+
+真实 highD recording 放到 `data/raw/highD/` 后：
+
+```bash
+python3 scripts/calibrate_highd.py --data-root data/raw/highD --recording 01
+python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
+  --start-time 0 --duration 10 --step 0.5 --max-frames 12 --gif
+```
+
+输出：
+
+- `results/highd_calibration_01.json`：标定参数、训练/验证 RMSE、样本数、recording ID；
+- `results/highd_replay/frame_*.png`：开环回放 BEV；
+- `results/highd_replay/highd_replay_01.json`：回放元数据；
+- 可选 `highd_replay_01.gif`。
+
+> `data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，只能验证链路，不能写成真实标定。详见 [../docs/10_highd_calibration_replay.md](../docs/10_highd_calibration_replay.md)。

@@ -41,6 +41,7 @@
 4. 任务成功判据会不会太严？——三个场景的判据都对应明确任务；不完成就是失败，避免假成功。
 5. invalid 轨迹怎么处理？——记录 + 1 s 内即将碰撞才急刹；更完整的安全包络是未来工作。
 6. 结果可复现吗？——commit `8c1353f`、seed 42–56、命令与 JSON/CSV 都在仓库。
+7. 实验性模块会不会混进主结果？——不会：CLI 默认拒绝 Game/EM/MPC/Pacejka/交叉口，必须加 `--allow-experimental`，且 benchmark 会写 `experimental=true`。
 
 ---
 
