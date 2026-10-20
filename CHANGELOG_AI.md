@@ -1,5 +1,22 @@
 # AI 修改记录
 
+## 2026-10-20 (完善 FSM 与 Game 决策差异度、基准元数据追溯与工程治理)
+
+- **修改文件**：`src/decision/game_theoretic.py`、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`configs/scenarios/highway_merge.yaml`、`src/evaluation/benchmark.py`、`.gitignore`、`results/README.md`、`requirements.txt`、`.github/workflows/ci.yml`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。
+- **修改内容**：
+  1. **决策对抗性与博弈区分度**：
+     - 在 `highway_merge` 场景中增加左侧邻道阻挡车（`obs_block_left`），构建主线紧凑车流与后车加速逼近的对抗工况；
+     - 修复 `ObstacleManager._evaluate_mobil_lane_change` 缺失侧向重叠安全几何过滤与道路边界约束的缺陷，避免背景车盲目变道与驶入匝道；
+     - 重构 `GameTheoreticDecisionMaker`：将目标车道后随车（`target_follower`）纳入二人非零和收益矩阵，精准评估切入冲突风险；在选择礼让时主动调节车速创造汇入间隙，待车流通过后平滑切入；
+     - 实测基准对比验证：在 `highway_merge` 下 Game 较 FSM 的 RMS jerk 降低 50.4%（0.999 vs 2.013 m/s³）；在 `cut_in` 下降低 34.9%（1.180 vs 1.812 m/s³），两类决策在多 seed 下表现出可解释的显著行为分流。
+  2. **基准结果与元数据可追溯治理**：
+     - `BenchmarkSuite` 中将 `planner/controller/tire_model` 记录为运行时解析后的算法实体名（`lattice/em`, `lqr/mpc`, `linear/pacejka`）并保留入参；
+     - 更新 `.gitignore` 允许跟踪核心基准结果与元数据（`results/benchmark.json`, `results/benchmark.csv`, `results/benchmark_summary.csv` 以及 `data/sample_highd/*.csv`），同时撰写 `results/README.md` 规范字段口径与复现命令；
+  3. **依赖锁定与自动化 CI 构建**：
+     - 锁定 `requirements.txt` 关键依赖至已在 Python 3.9 环境充分验证的版本上限；
+     - 新增 GitHub Actions 工作流 `.github/workflows/ci.yml`，在多 Python 版本下自动执行单元测试与轻量冒烟基准。
+- **验证方式及结果**：`python3 -B -m unittest discover tests` 65 项全绿；`git diff --check` 通过；`scripts/run_benchmark.py --scenarios highway_merge cut_in --decisions fsm game --seeds 42 43 44` 运行完毕并更新基准文件。
+
 ## 2026-10-20 (优化规划计算几何与碰撞距离粗筛，时延 p95 降至 10ms 内)
 
 - **修改文件**：`src/common/geometry.py`、`src/planning/cost_evaluator.py`、`src/common/frenet_frame.py`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。

@@ -1,19 +1,19 @@
-# 核心计算与科学库
-numpy>=1.23.0
-scipy>=1.9.0
-pandas>=1.5.0
+# 核心计算与科学库（已在 Python 3.9.6 环境下全量验证）
+numpy>=1.23.0,<=2.0.2
+scipy>=1.9.0,<=1.13.1
+pandas>=1.5.0,<=2.2.3
 
 # 可视化与图形渲染
-matplotlib>=3.6.0
+matplotlib>=3.6.0,<=3.9.2
 
 # 场景配置与数据序列化
-pyyaml>=6.0
+pyyaml>=6.0,<=6.0.2
 
 # 测试与代码质量
-pytest>=7.2.0
-black>=23.0.0
-flake8>=6.0.0
-typing-extensions>=4.5.0
+pytest>=7.2.0,<=8.3.3
+black>=23.0.0,<=24.8.0
+flake8>=6.0.0,<=7.1.1
+typing-extensions>=4.5.0,<=4.12.2
 
 # 说明：
 # - cvxpy / osqp / pygame / seaborn / shapely 当前未使用，已从必需依赖中移除；
