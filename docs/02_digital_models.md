@@ -78,7 +78,7 @@ $$I_z \dot{r} = l_f F_{yf} - l_r F_{yr}$$
   $$F_y = D \sin\left(C \arctan\left(B \alpha - E(B \alpha - \arctan(B \alpha))\right)\right),\quad D=\mu F_z D_{scale}$$
   并计入纵向载荷转移与简化摩擦椭圆组合滑移。
 
-Pacejka 分支不含轮胎松弛长度、温度/胎压与完整试验标定，因此应表述为“Pacejka 稳态魔术公式已进入 2-DOF 动力学主回路”，不能写成完整轮胎试验台模型。通过 `--tire pacejka` 可复现该分支。
+Pacejka 分支不含轮胎松弛长度、温度/胎压与完整试验标定，因此应表述为“Pacejka 稳态魔术公式已进入 2-DOF 动力学主回路”，不能写成完整轮胎试验台模型。通过 `--tire pacejka --allow-experimental` 可复现该分支（实验性，不纳入主结果）。
 
 ---
 

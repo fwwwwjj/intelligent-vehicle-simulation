@@ -20,11 +20,12 @@ flowchart LR
     F -->|状态反馈| B
 ```
 
-四条主回路均可通过装配层独立切换：
+四条主回路可通过装配层独立切换；它们属于实验性模块，CLI 需要显式加 `--allow-experimental`，输出会标记 `experimental=true`，不纳入主结果：
 
 ```bash
 python3 scripts/run_simulation.py --scenario emergency_avoidance \
-  --planner em --controller mpc --tire pacejka --duration 10 --no_vis
+  --planner em --controller mpc --tire pacejka --duration 10 --no_vis \
+  --allow-experimental
 ```
 
 ---
@@ -312,7 +313,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
   nice -n 19 python3 -B scripts/run_simulation.py \
   --scenario emergency_avoidance --decision fsm \
   --planner em --controller mpc --tire pacejka \
-  --duration 5 --no_vis
+  --duration 5 --no_vis --allow-experimental
 ```
 
 ### 7.3 已覆盖的断言

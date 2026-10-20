@@ -35,7 +35,7 @@
 ### 2.3 虚拟仿真实验教学
 - 学生可直接观察跟驰、汇入、紧急制动三种核心行为，以及 LQR/PID 参数变化对跟踪误差与舒适性的影响；
 - 核心链路使用 `--decision fsm`；`--decision game` 为探索性模块，当前汇入任务不完成，不建议作为教学主例；
-- `--dynamic`、`--tire pacejka`、`--planner em`、`--controller mpc` 为未来工作接口，可在课程中作为“扩展实验”，但不纳入当前验收。
+- `--dynamic`、`--tire pacejka`、`--planner em`、`--controller mpc` 为未来工作接口；CLI 需显式加 `--allow-experimental`，可在课程中作为“扩展实验”，但不纳入当前验收。
 
 ### 2.4 学术算法原型验证
 - 系统提供 `BasePlanner` / `BaseDecisionMaker` / `BaseController` 抽象接口，新增算法只需实现对应接口；

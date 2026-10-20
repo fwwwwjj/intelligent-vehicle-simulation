@@ -272,6 +272,8 @@ sequenceDiagram
 > 本节用于防止“接口预留”被写成“已完成”。修改代码或文档前，先对照下表。
 >
 > **v0.4-core 范围**：核心交付只包含 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**。Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真属于未来工作，代码保留但不纳入主结果；详见 `docs/07_scope_and_future_work.md`。
+>
+> **实验性隔离**：`build_engine` 会把上述模块标记为 `experimental`；`run_simulation.py`/`run_benchmark.py` 默认拒绝运行，必须显式加 `--allow-experimental`；benchmark 元数据写入 `experimental/experimental_reasons`。
 
 ### 1. 已进入核心闭环的模块
 
