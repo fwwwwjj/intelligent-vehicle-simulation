@@ -57,26 +57,26 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
   --decisions fsm \
-  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 \
+  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 \
   --duration 20.0
 ```
 
 ### 3.2 结果表
 
-环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 15 seeds，20 s 闭环；成功率附 Wilson 95% 置信区间。
+环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 30 seeds，20 s 闭环；成功率附 Wilson 95% 置信区间。
 
 | 场景 | 决策 | n | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 最大横向加速度 (m/s²) | 任务完成时间 (s) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | FSM | 15 | 1.000 [0.796, 1.000] | 1.84 ± 0.01 | 20.42 ± 0.11 | 2.007 ± 0.020 | 0.060 ± 0.000 | 2.500 ± 0.000 | 11.71 ± 0.03 | 3.08 / 4.31 |
-| `cut_in` | FSM | 15 | 1.000 [0.796, 1.000] | 5.50 ± 0.15 | 1.75 ± 0.04 | 1.832 ± 0.043 | 0.074 ± 0.004 | 2.510 ± 0.000 | — | 2.66 / 6.75 |
-| `emergency_avoidance` | FSM | 15 | 1.000 [0.796, 1.000] | 14.10 ± 0.15 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 0.000 ± 0.000 | — | 2.08 / 2.58 |
+| `highway_merge` | FSM | 30 | 1.000 [0.886, 1.000] | 1.84 ± 0.01 | 20.41 ± 0.12 | 2.003 ± 0.021 | 0.060 ± 0.000 | 2.500 ± 0.000 | 11.72 ± 0.03 | 2.29 / 3.15 |
+| `cut_in` | FSM | 30 | 1.000 [0.886, 1.000] | 5.47 ± 0.16 | 1.75 ± 0.04 | 1.833 ± 0.038 | 0.074 ± 0.003 | 2.510 ± 0.000 | — | 1.99 / 5.06 |
+| `emergency_avoidance` | FSM | 30 | 1.000 [0.886, 1.000] | 14.11 ± 0.13 | 2.37 ± 0.00 | 1.803 ± 0.002 | 0.000 ± 0.000 | 0.000 ± 0.000 | — | 1.56 / 1.89 |
 
 > 说明：
-> - 15 seeds 是**轻量基准**，用于确认链路和统计管线；论文目标为每条件 30–50 seeds；
+> - 30 seeds 是**轻量基准**，用于确认链路和统计管线；论文目标为每条件 30–50 seeds；
 > - `task_completion_time_s=999` 表示该场景没有离散“完成时刻”（cut_in/emergency 用终态判据），不是“999 秒完成”；
 > - 所有场景 `road_departure=0`、`collision_frames=0`；
 > - 规划时延是单机实测，受硬件/负载影响；论文需报告 p50/p95/p99 与硬件环境。
-> 诊断字段：`planner_invalid_count` 均值分别为 highway_merge 0.1、cut_in 11.1、emergency_avoidance 30.3；`safety_brake_count` 均为 0。含义是规划器在部分帧把“远端碰撞/加速度越界”候选标记为 invalid，但没有触发 1 s 内即将碰撞的最小风险制动；这些帧仍由 LQR 跟踪并在下一步重规划。
+> 诊断字段：`planner_invalid_count` 均值分别为 highway_merge 0.1、cut_in 11.2、emergency_avoidance 30.2；`safety_brake_count` 均为 0。含义是规划器在部分帧把“远端碰撞/加速度越界”候选标记为 invalid，但没有触发 1 s 内即将碰撞的最小风险制动；这些帧仍由 LQR 跟踪并在下一步重规划。
 
 ### 3.3 结果分析
 
@@ -109,7 +109,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
      --decisions fsm --seeds 42 43 44 --duration 20
    ```
 
-4. **核心图表**：`scripts/export_core_figures.py` 生成 3 张 BEV、1 张三场景遥测图、1 张 15-seed KPI 箱线图。
+4. **核心图表**：`scripts/export_core_figures.py` 生成 3 张 BEV、1 张三场景遥测图、1 张 30-seed KPI 箱线图。
    ```bash
    python3 scripts/export_core_figures.py --seed 42 --duration 20 \
      --output-dir results/competition_pack/figures
@@ -126,7 +126,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 ## 5. 当前局限
 
-- **样本量**：15 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
+- **样本量**：30 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
 - **场景多样性**：三个核心场景都是结构化道路/合成交通；highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补。
 - **车辆模型**：核心链路使用运动学自行车模型，不能体现轮胎侧滑/极限工况；2-DOF + Pacejka 属于未来工作。
 - **控制**：LQR 的横向加速度已限制在 2.5 m/s² 附近；但高速换道的舒适性仍有优化空间。

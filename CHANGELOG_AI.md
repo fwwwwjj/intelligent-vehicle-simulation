@@ -8,14 +8,14 @@
   2. **任务级 success**：`success_rate` 不再只判断碰撞，而是由场景目标 + 无碰撞 + 不驶出道路共同决定；新增 `task_success`、`task_completed`、`task_completion_time_s`、`road_departure` 字段。这样 Game 未汇入、交叉口驶出道路都会自动判 0，避免“没做事也算成功”。
   3. **横向约束修复**：去掉 LQR/MPC 中 `max(lat_steer_limit, 0.05)` 的转角下限，改为 1e-3 数值保护；22 m/s 下横向加速度不再被抬到约 9 m/s²，而是限制在 2.5 m/s² 附近。
   4. **安全监督**：规划轨迹 invalid 时不再一律急刹；只有轨迹为空或前 1 s 内存在 OBB 碰撞时才进入最小风险制动，记录 `planner_invalid` / `safety_brake`。避免把“远端碰撞/加速度越界”误判成急刹。
-  5. **基准与分批 seeds**：3 场景 × FSM，基础 10 seeds（42–51）+ 分批 5 seeds（52–56），共 **15 seeds / 45 次运行**，20 s 闭环；新增 `scripts/run_benchmark_batches.py`（批间 sleep，避免持续发热），结果合并写回 `results/benchmark.json/csv/summary.csv`。15 seeds 仍为轻量基准，论文目标 30–50 seeds。
+  5. **基准与分批 seeds**：3 场景 × FSM，基础 10 seeds（42–51）+ 分批 20 seeds（52–71，4 批 × 5），共 **30 seeds / 90 次运行**，20 s 闭环；新增 `scripts/run_benchmark_batches.py`（批间 sleep，避免持续发热），结果合并写回 `results/benchmark.json/csv/summary.csv`。30 seeds 仍为轻量基准，论文目标 30–50 seeds。
   6. **测试**：新增 `tests/test_task_success.py`（任务成功、未汇入判失败、交叉口未完成判失败、cut-in/紧急制动成功、LQR 横向加速度上限、invalid 轨迹安全兜底）、YAML/内置场景一致性测试、`tests/test_highd_tools.py`（highD 样本/标定/路网）与 `tests/test_experimental_guard.py`（Game/EM/MPC/Pacejka/交叉口隔离）；全量 **96 项测试通过**（约 10–20 s，单线程 BLAS + nice）。
   7. **实验性模块隔离**：`build_engine` 会把 Game/EM/MPC/Pacejka/交叉口标记为 `experimental`；CLI 默认拒绝运行，必须显式加 `--allow-experimental`；benchmark 元数据写入 `experimental/experimental_reasons`，避免与核心结果混表。
   8. **highD 最小可信版**：新增 `src/environment/highd_tools.py`、`scripts/calibrate_highd.py`、`scripts/replay_highd.py` 与 `docs/10_highd_calibration_replay.md`；支持真实 highD 同车道跟驰标定 + 开环回放；合成样例会标记 `synthetic_sample`。
   9. **文档与交付**：README/docs/03/docs/04 删除“Game 50.4% 提升”“交叉口已实现”“MPC 已可替代 LQR”等表述；新增 `docs/07_scope_and_future_work.md`、`docs/08_paper_draft.md`、`docs/10_highd_calibration_replay.md`；docs/06 标注为未来工作技术储备；恢复 `.github/workflows/ci.yml`；新增 `LICENSE`；新增 `scripts/export_core_figures.py` 并生成 5 张核心图。
 - **验证方式及结果**：
   - `OMP_NUM_THREADS=1 ... nice -n 19 python3 -B -m unittest discover tests` → 96 项通过（约 10–20 s）；
-  - `run_benchmark.py ... --seeds 42..51` + `run_benchmark_batches.py --seeds 52..56` → 45 次运行完成，三场景任务成功率 1.000 [0.796, 1.000]；
+  - `run_benchmark.py ... --seeds 42..51` + `run_benchmark_batches.py --seeds 52..71` → 90 次运行完成，三场景任务成功率 1.000 [0.886, 1.000]；
   - `calibrate_highd.py` / `replay_highd.py` 在 `data/sample_highd` 上自检通过（输出标记 synthetic_sample）；
   - `export_core_figures.py` → 5 张核心图写入 `results/competition_pack/figures/`；
   - 任务级回归：Game 20 s 未汇入 → `success=0`；交叉口驶出道路 → `success=0`；核心 FSM 三场景 → `success=1`。

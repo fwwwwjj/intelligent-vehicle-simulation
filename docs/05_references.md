@@ -16,7 +16,7 @@ intelligent-vehicle-simulation/
 ├── docs/                       # 大赛技术支撑材料
 │   ├── 01_problem_and_data.md  # 问题来源与数据来源说明
 │   ├── 02_digital_models.md    # 数字模型（核心/未来工作标注）
-│   ├── 03_results_and_demo.md  # 核心 15-seed 结果与分析
+│   ├── 03_results_and_demo.md  # 核心 30-seed 结果与分析
 │   ├── 04_application.md       # 应用与工程落地
 │   ├── 05_references.md        # 代码体系与参考文献
 │   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
@@ -55,11 +55,11 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 # 核心场景闭环 + KPI
 python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
 
-# 核心基准（15 seeds；论文目标 30–50 seeds）
+# 核心基准（30 seeds；论文目标 30–50 seeds）
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
-  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 --duration 20
+  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 --duration 20
 ```
 
 ---

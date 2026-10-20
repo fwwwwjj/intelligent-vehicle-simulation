@@ -81,7 +81,7 @@ intelligent-vehicle-simulation/
 ├── docs/
 │   ├── 01_problem_and_data.md  # 问题与数据来源
 │   ├── 02_digital_models.md    # 数字模型（核心/未来工作标注）
-│   ├── 03_results_and_demo.md  # 核心 15-seed 结果与分析
+│   ├── 03_results_and_demo.md  # 核心 30-seed 结果与分析
 │   ├── 04_application.md       # 应用与工程落地
 │   ├── 05_references.md        # 代码体系与参考文献
 │   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
@@ -99,7 +99,7 @@ intelligent-vehicle-simulation/
 │   └── simulator.py            # 闭环仿真主引擎
 ├── scripts/                    # run_simulation / run_benchmark / export_results
 ├── tests/                      # 96 项单元/闭环测试
-└── results/                    # 15-seed 核心基准 JSON/CSV、归档
+└── results/                    # 30-seed 核心基准 JSON/CSV、归档
 ```
 
 > 标注“探索性/未来工作”的模块不是删除，而是**不纳入当前论文/答辩主结果**；接口、单元测试和 CLI 开关保留，方便后续继续做。
@@ -178,14 +178,14 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 当前 **96 项测试**，约 10–20 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
 
-### 4. 运行核心基准（低功耗，15 seeds）
+### 4. 运行核心基准（低功耗，30 seeds）
 
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
   --decisions fsm \
-  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 \
+  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 \
   --duration 20.0
 ```
 
@@ -206,9 +206,9 @@ python3 scripts/export_core_figures.py --seed 42 --duration 20 \
   --output-dir results/competition_pack/figures
 ```
 
-输出 3 张 BEV、1 张三场景遥测图和 1 张 15-seed KPI 箱线图。
+输出 3 张 BEV、1 张三场景遥测图和 1 张 30-seed KPI 箱线图。
 
-> 15 seeds 是轻量基准；论文目标为每条件 30–50 seeds。建议分批运行，保持单线程 BLAS + `nice`，避免机器持续高负载。
+> 30 seeds 是轻量基准；论文目标为每条件 30–50 seeds。建议分批运行，保持单线程 BLAS + `nice`，避免机器持续高负载。
 
 ### 6. highD 最小可信版（需真实数据）
 
@@ -229,13 +229,13 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 
 ## 六、 核心结果
 
-环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 15 seeds，20 s 闭环。
+环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 30 seeds，20 s 闭环。
 
 | 场景 | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | 1.000 [0.796, 1.000] | 1.84 ± 0.01 | 20.42 ± 0.11 | 2.007 ± 0.020 | 0.060 ± 0.000 | 3.08 / 4.31 |
-| `cut_in` | 1.000 [0.796, 1.000] | 5.50 ± 0.15 | 1.75 ± 0.04 | 1.832 ± 0.043 | 0.074 ± 0.004 | 2.66 / 6.75 |
-| `emergency_avoidance` | 1.000 [0.796, 1.000] | 14.10 ± 0.15 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.08 / 2.58 |
+| `highway_merge` | 1.000 [0.886, 1.000] | 1.84 ± 0.01 | 20.41 ± 0.12 | 2.003 ± 0.021 | 0.060 ± 0.000 | 2.29 / 3.15 |
+| `cut_in` | 1.000 [0.886, 1.000] | 5.47 ± 0.16 | 1.75 ± 0.04 | 1.833 ± 0.038 | 0.074 ± 0.003 | 1.99 / 5.06 |
+| `emergency_avoidance` | 1.000 [0.886, 1.000] | 14.11 ± 0.13 | 2.37 ± 0.00 | 1.803 ± 0.002 | 0.000 ± 0.000 | 1.56 / 1.89 |
 
 > 任务成功率 = 完成任务 + 无碰撞 + 不驶出道路，不是“未碰撞”。详细定义、逐 seed 结果与复现命令见 [docs/03_results_and_demo.md](docs/03_results_and_demo.md) 和 `results/`。
 > 图表见 `results/competition_pack/figures/`；论文草稿见 [docs/08_paper_draft.md](docs/08_paper_draft.md)；答辩/视频大纲见 [docs/09_slides_and_video_outline.md](docs/09_slides_and_video_outline.md)。
@@ -253,7 +253,7 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 - IDM 跟驰与脚本化 cut-in；
 - 任务级 KPI：碰撞、净距、TTC、Jerk、横向/航向误差、决策/规划/控制时延、任务成功/完成时间/驶出道路；
 - 三个核心场景、YAML/JSON/内置场景加载、seed 复现；
-- 15-seed 基准与 JSON/CSV 结果。
+- 30-seed 基准与 JSON/CSV 结果。
 
 **未来工作（不纳入当前主结果）：**
 

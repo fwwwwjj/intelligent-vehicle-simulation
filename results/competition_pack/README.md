@@ -4,19 +4,19 @@
 
 - 范围：HFSM + Frenet Lattice + LQR + 运动学模型；
 - 场景：highway_merge、cut_in、emergency_avoidance；
-- 样本：15 seeds（轻量基准）；
+- 样本：30 seeds（轻量基准）；
 - 成功判据：任务完成 + 无碰撞 + 不驶出道路。
 
 ## 已生成
 
 | 文件 | 内容 |
 | :--- | :--- |
-| `kpi_table.md` | 15-seed 核心 KPI 表 |
+| `kpi_table.md` | 30-seed 核心 KPI 表 |
 | `figures/fig1_highway_merge_bev.png` | 高速汇入 BEV（首次进入主车道附近） |
 | `figures/fig2_cut_in_bev.png` | cut-in 最小净距帧 |
 | `figures/fig3_emergency_avoidance_bev.png` | 紧急制动停车帧 |
 | `figures/fig4_core_telemetry.png` | 三场景速度/加速度/Jerk/TTC 遥测 |
-| `figures/fig5_core_kpi_distribution.png` | 15-seed KPI 箱线图 |
+| `figures/fig5_core_kpi_distribution.png` | 30-seed KPI 箱线图 |
 
 生成命令：
 
