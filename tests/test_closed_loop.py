@@ -22,6 +22,7 @@ from src.environment.scenario_loader import (
     build_cut_in_scenario,
     build_emergency_avoidance_scenario,
     build_highway_merge_scenario,
+    build_intersection_unprotected_scenario,
     load_named_scenario,
 )
 from src.planning.frenet_lattice import FrenetLatticePlanner
@@ -68,6 +69,25 @@ class TestClosedLoop(unittest.TestCase):
         self.assertIn("main_lane_0", scenario.road_network.lanes)
         self.assertNotIn("ramp_0", scenario.road_network.lanes)
         self.assertEqual(scenario.current_lane_id, "main_lane_0")
+
+    def test_intersection_unprotected_scenario_structure(self):
+        scenario = build_intersection_unprotected_scenario()
+        self.assertIn("main_lane_0", scenario.road_network.lanes)
+        self.assertIn("opposing_straight", scenario.road_network.lanes)
+        self.assertIn("cross_straight", scenario.road_network.lanes)
+        ref_line = scenario.road_network.get_reference_line("main_lane_0")
+        self.assertIsNotNone(ref_line)
+        self.assertGreater(len(ref_line), 20)
+        self.assertEqual(scenario.current_lane_id, "main_lane_0")
+        self.assertGreater(len(scenario.obstacle_manager.obstacles), 0)
+
+    def test_intersection_unprotected_closed_loop_steps(self):
+        scenario = build_intersection_unprotected_scenario()
+        engine = build_engine(scenario, decision="game", enable_visualization=False)
+        for _ in range(10):
+            record = engine.step()
+            self.assertIsNotNone(record)
+        self.assertGreater(engine.current_time, 0.0)
 
     def test_fsm_uses_configured_ego_dimensions(self):
         network = _straight_network()

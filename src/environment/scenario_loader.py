@@ -199,6 +199,39 @@ CUT_IN_DICT: Dict[str, Any] = {
 }
 
 
+INTERSECTION_UNPROTECTED_DICT: Dict[str, Any] = {
+    "scenario_id": "SCENARIO_INTERSECTION_UNPROTECTED_01",
+    "description": "城市十字路口无保护左转：主车执行左转穿插，与对向直行冲突车流博弈",
+    "map": {
+        "type": "intersection_unprotected",
+        "lane_width": 3.75,
+        "speed_limit": 11.11,
+        "road_length": 160.0,
+    },
+    "ego_initial_state": {
+        "x": 10.0,
+        "y": -1.875,
+        "v": 5.56,
+        "heading": 0.0,
+        "lane_id": "main_lane_0",
+    },
+    "obstacles": [
+        {
+            "id": "obs_oncoming_straight",
+            "type": "car",
+            "initial_state": {"x": 100.0, "y": 1.875, "v": -8.33, "heading": 3.14159, "lane_id": "opposing_straight"},
+            "behavior_type": "constant_speed",
+        },
+        {
+            "id": "obs_cross_lead",
+            "type": "car",
+            "initial_state": {"x": 73.75, "y": 45.0, "v": 8.33, "heading": 1.5708, "lane_id": "cross_straight"},
+            "behavior_type": "constant_speed",
+        },
+    ],
+}
+
+
 @dataclass
 class Scenario:
     """仿真场景的完整执行上下文。"""
@@ -262,15 +295,85 @@ def _build_road_network(data: Dict[str, Any], config: Dict[str, Any]) -> RoadNet
     speed_limit = float(map_cfg.get("speed_limit", config["environment"]["speed_limit"]))
     map_type = str(map_cfg.get("type", "")).lower()
 
-    # 只有匝道/汇入类地图才应该生成 ramp_0。早期实现无条件给所有场景
-    # 加一条与主线等长的“幽灵匝道”，会让直线场景的多余车道参与最近车道查询。
+    road = RoadNetwork()
+
+    # 1. 优先支持显式自定义车道列表
+    custom_lanes = map_cfg.get("lanes")
+    if custom_lanes:
+        for l_cfg in custom_lanes:
+            pts = [(float(pt[0]), float(pt[1])) for pt in l_cfg.get("center_points", [])]
+            road.add_lane(
+                Lane(
+                    lane_id=str(l_cfg["lane_id"]),
+                    width=float(l_cfg.get("width", lane_width)),
+                    speed_limit=float(l_cfg.get("speed_limit", speed_limit)),
+                    left_lane_id=l_cfg.get("left_lane_id"),
+                    right_lane_id=l_cfg.get("right_lane_id"),
+                    center_points=pts,
+                )
+            )
+        for lane_id in road.lanes:
+            road.generate_reference_line(lane_id, sample_step=1.0)
+        return road
+
+    # 2. 城市十字交叉路口拓扑 (包含无保护左转与冲突直行流)
+    if "intersection" in map_type or "crossroad" in map_type:
+        # main_lane_0: 自车西向东接近 + 路口无保护左转 + 北向驶出
+        pts_left_turn: List[Tuple[float, float]] = []
+        for x in range(0, 51, 2):
+            pts_left_turn.append((float(x), -lane_width / 2.0))
+        # 转向圆弧: R=20m, 从 (50, -w/2) 转向 (70, 20 - w/2)
+        r_turn = 20.0
+        y_center = 20.0 - lane_width / 2.0
+        for i in range(1, 21):
+            alpha = (math.pi / 2.0) * (i / 20.0)
+            x_arc = 50.0 + r_turn * math.sin(alpha)
+            y_arc = y_center - r_turn * math.cos(alpha)
+            pts_left_turn.append((float(x_arc), float(y_arc)))
+        for y_exit in range(int(y_center) + 2, 121, 2):
+            pts_left_turn.append((70.0, float(y_exit)))
+
+        road.add_lane(
+            Lane(
+                lane_id="main_lane_0",
+                width=lane_width,
+                speed_limit=speed_limit,
+                center_points=pts_left_turn,
+            )
+        )
+
+        # opposing_straight: 对向东向西直行车道 (y = +w/2, 穿过路口冲突区)
+        pts_opposing = [(float(x), lane_width / 2.0) for x in range(160, -1, -2)]
+        road.add_lane(
+            Lane(
+                lane_id="opposing_straight",
+                width=lane_width,
+                speed_limit=speed_limit,
+                center_points=pts_opposing,
+            )
+        )
+
+        # cross_straight: 南北向直行车道
+        pts_cross = [(70.0 + lane_width, float(y)) for y in range(-40, 121, 2)]
+        road.add_lane(
+            Lane(
+                lane_id="cross_straight",
+                width=lane_width,
+                speed_limit=speed_limit,
+                center_points=pts_cross,
+            )
+        )
+
+        for lane_id in road.lanes:
+            road.generate_reference_line(lane_id, sample_step=1.0)
+        return road
+
+    # 3. 标准高速与直线道路拓扑
     has_ramp = (
         bool(map_cfg.get("has_ramp", False))
         or "ramp" in map_type
         or map_type in {"merge", "highway_merge"}
     )
-
-    road = RoadNetwork()
 
     def add_straight_lane(lane_id: str, y: float, length: float, left: Optional[str], right: Optional[str]) -> None:
         pts = [(float(x), float(y)) for x in range(0, int(length) + 1, 2)]
@@ -417,10 +520,18 @@ def build_cut_in_scenario() -> Scenario:
     return _build_from_dict(CUT_IN_DICT, DEFAULT_CONFIG, name="cut_in")
 
 
+def build_intersection_unprotected_scenario() -> Scenario:
+    """不依赖 PyYAML 的城市无保护左转交叉路口场景。"""
+    return _build_from_dict(
+        INTERSECTION_UNPROTECTED_DICT, DEFAULT_CONFIG, name="intersection_unprotected"
+    )
+
+
 _BUILTIN_SCENARIO_BUILDERS = {
     "highway_merge": build_highway_merge_scenario,
     "emergency_avoidance": build_emergency_avoidance_scenario,
     "cut_in": build_cut_in_scenario,
+    "intersection_unprotected": build_intersection_unprotected_scenario,
 }
 
 

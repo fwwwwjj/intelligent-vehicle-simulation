@@ -320,7 +320,10 @@ class ObstacleManager:
         for obs_id, obs in self.obstacles.items():
             accel = accelerations.get(obs_id, 0.0)
             self._last_accelerations[obs_id] = accel
-            obs.vx = float(max(0.0, obs.vx + accel * dt))
+            if obs.vx >= 0.0:
+                obs.vx = float(max(0.0, obs.vx + accel * dt))
+            else:
+                obs.vx = float(min(0.0, obs.vx - accel * dt))
 
             # 横向换道过渡 (平滑三次多项式插值)
             lc_state = self._lane_change_states.get(obs_id)
@@ -361,34 +364,36 @@ class ObstacleManager:
         steps = int(horizon / dt)
         cur_x, cur_y = obs.x, obs.y
         longitudinal_accel = self._last_accelerations.get(obstacle_id, 0.0)
-        initial_vx = max(0.0, obs.vx)
+        direction = 1.0 if obs.vx >= 0.0 else -1.0
+        initial_speed = abs(obs.vx)
         stop_distance = (
-            initial_vx ** 2 / (-2.0 * longitudinal_accel)
+            initial_speed ** 2 / (2.0 * abs(longitudinal_accel))
             if longitudinal_accel < 0.0 else float("inf")
         )
         stop_time = (
-            initial_vx / (-longitudinal_accel)
+            initial_speed / abs(longitudinal_accel)
             if longitudinal_accel < 0.0 else float("inf")
         )
         for i in range(steps):
             t = (i + 1) * dt
-            predicted_vx = max(0.0, initial_vx + longitudinal_accel * t)
+            predicted_speed = max(0.0, initial_speed + longitudinal_accel * t)
             if t >= stop_time:
-                longitudinal_displacement = stop_distance
+                displacement = stop_distance
             else:
-                longitudinal_displacement = max(
-                    0.0, initial_vx * t + 0.5 * longitudinal_accel * t ** 2
+                displacement = max(
+                    0.0, initial_speed * t + 0.5 * longitudinal_accel * t ** 2
                 )
+            pred_vx = direction * predicted_speed
             pred_pts.append(TrajectoryPoint(
-                x=float(cur_x + longitudinal_displacement),
+                x=float(cur_x + direction * displacement),
                 y=float(cur_y + obs.vy * t),
                 theta=(
-                    float(np.arctan2(obs.vy, predicted_vx))
-                    if predicted_vx > 1e-9 or abs(obs.vy) > 1e-9
+                    float(np.arctan2(obs.vy, pred_vx))
+                    if abs(predicted_speed) > 1e-9 or abs(obs.vy) > 1e-9
                     else float(obs.heading)
                 ),
-                v=float(np.hypot(predicted_vx, obs.vy)),
-                t=float(t)
+                v=float(np.hypot(predicted_speed, obs.vy)),
+                t=float(t),
             ))
         obs.predicted_trajectory = pred_pts
         return pred_pts

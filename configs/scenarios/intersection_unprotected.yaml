@@ -1,0 +1,26 @@
+# 场景描述: 城市十字路口无保护左转与冲突车流博弈 (Urban Unprotected Left Turn)
+scenario_id: "SCENARIO_INTERSECTION_UNPROTECTED_01"
+description: "主车在城市十字路口执行无保护左转，需与对向直行冲突来车进行时空路权博弈并平稳过弯"
+
+map:
+  type: "intersection_unprotected"
+  lane_width: 3.75
+  speed_limit: 11.11           # 40 km/h 城市路口限速
+  road_length: 160.0
+
+ego_initial_state:
+  x: 10.0
+  y: -1.875                    # 位于接近车道中心
+  v: 5.56                      # 20 km/h 低速接近路口
+  heading: 0.0
+  lane_id: "main_lane_0"
+
+obstacles:
+  - id: "obs_oncoming_straight"
+    type: "car"
+    initial_state: {x: 100.0, y: 1.875, v: -8.33, heading: 3.14159, lane_id: "opposing_straight"}
+    behavior_type: "constant_speed"
+  - id: "obs_cross_lead"
+    type: "car"
+    initial_state: {x: 73.75, y: 45.0, v: 8.33, heading: 1.5708, lane_id: "cross_straight"}
+    behavior_type: "constant_speed"
