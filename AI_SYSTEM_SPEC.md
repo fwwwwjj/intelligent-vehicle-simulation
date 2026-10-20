@@ -1,7 +1,7 @@
 # 智能车辆仿真系统：全栈架构规范、变量量纲口径与 AI 协作开发指南
 ### Intelligent Vehicle Simulation System: Architecture, Conventions, and AI Collaboration Specification
 
-> **版本**：v0.4-core（2026-10-20）。本版把范围收敛到 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**；Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真统一列为未来工作。v0.3 中的 QP/MPC/EM/Pacejka 实现仍保留为技术储备，但不纳入当前主结果。范围清单见 `docs/07_scope_and_future_work.md`。
+> **版本**：v0.4-core（2026-10-20）。本版把范围收敛到 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**；Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真统一列为未来工作。v0.3 中的 QP/MPC/EM/Pacejka 实现仍保留为技术储备，但不纳入当前主结果。范围清单见 `docs/07_scope_and_future_work.md`。新增独立基线/消融结果见 `docs/11_baseline_and_ablation.md`：990次、每条件/场景30个感知噪声seeds；实验覆盖不等于安全/泛化验收，原主结果未改。
 
 > **说明文档定位**：本规范文件为本项目（中国仿真创新应用大赛参赛作品）的**单一真实数据源（Single Source of Truth, SSOT）**。旨在统一整个系统内部的所有数学物理坐标系、状态变量命名口径、量纲单位及模块间交互契约。
 > 
@@ -237,7 +237,7 @@ sequenceDiagram
 
 ### 7. `src/runner.py` (装配层)
 - **职责**：把 `Scenario` 装配为 `SimulationEngine`，统一读取车辆参数、传感器参数、决策器/规划器/控制器/轮胎模型；
-- **算法选择**：`build_planner(scenario, planner="lattice"|"em")`、`build_controller(scenario, controller="lqr"|"mpc")`、`build_engine(..., tire_model="linear"|"pacejka")`；优先级为显式参数 > 场景配置 > 默认值；
+- **算法选择**：`build_planner(scenario, planner="lattice"|"em"|"centerline")`、`build_controller(scenario, controller="lqr"|"mpc"|"pure_pursuit")`、`build_engine(..., tire_model="linear"|"pacejka")`；优先级为显式参数 > 场景配置 > 默认值；
 - **禁止项**：装配层不得包含决策、规划或控制算法逻辑，也不得硬编码与场景 YAML 不一致的世界参数。
 
 ### 8. `src/common/qp.py` (优化后端)
@@ -301,13 +301,13 @@ sequenceDiagram
 | 模块 | 现状 | 禁止表述 |
 | :--- | :--- | :--- |
 | 博弈决策 `game_theoretic.py` | 收益评估/信念更新原型；高速汇入 20 s 内未完成汇入 | “Game 优于 FSM”“已完成博弈验证” |
-| EM/QP `em_planner.py` | 路径 QP + 速度 QP 原型；未做多 seed 统计 | “EM/QP 已完成大规模验证” |
+| EM/QP `em_planner.py` | 路径/速度QP原型；已完成固定三场景30-seed补充对比，仍为实验性 | “EM/QP 已完成大规模验证” |
 | LTV-MPC `mpc_controller.py` | 线性化误差模型 + QP；紧急制动会碰撞 | “MPC 可替代 LQR/已通过安全验证” |
 | Pacejka `tire.py` | 稳态魔术公式原型；未做试验标定 | “已完成轮胎试验标定” |
 | 城市无保护路口 | 拓扑存在；当前会驶出道路 | “无保护左转已实现” |
 | highD / INTERACTION / NGSIM | highD 仅有解析器 + 合成样例；其余接口骨架 | “已接入真实数据/已完成标定” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
-| 大规模多 seed 统计 | 当前核心 30 seeds（10 base + 20 batch），属轻量基准 | “统计显著优于基线” |
+| 多seed统计 | 原核心30 seeds保持；独立补充11条件×3场景×30 seeds=990次，仅扰动感知噪声 | “对场景分布统计显著/全面优于基线” |
 
 ### 3. 指标口径
 
@@ -333,7 +333,26 @@ sequenceDiagram
 ### 4. 结果可信度
 
 - 结果表必须由 `scripts/run_benchmark.py` 或 `scripts/run_simulation.py --save_results` 生成；批量基准写出 `benchmark.json`、原始运行 `benchmark.csv` 和分组 `benchmark_summary.csv`；
-- 至少报告 seed、场景、时长、样本数；单 seed/30-seed 结果不得写成统计结论；
+- 至少报告 seed、场景、时长、样本数；单seed/固定场景30-seed结果不得外推为道路场景分布上的统计结论；
 - 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用；
 - 当前核心结果：3 场景 × FSM × 30 seeds（10 base + 20 batch）；论文目标 30–50 seeds；
 - Game/EM/MPC/Pacejka/交叉口的短时冒烟或探索性结果不得写成“统计显著优于 LQR/Lattice/FSM”。
+
+
+### 5. 基线/消融补充实验入口与验收（2026-10-20）
+
+- `IDMDecisionMaker`：ACC+AEB、无换道；`fsm_no_lane_change`保留跟驰/急停，关闭战术换道。
+  `CenterlinePlanner`不搜索或检查障碍物；`PurePursuitController`使用几何纯跟踪+纵向PID。
+  这些替换仍复用统一安全监督，详见 `src/evaluation/contrast.py` 的11条件矩阵。
+- `scripts/run_contrast.py`：串行990次，独立写入 `results/contrast/`，实验性条件须显式允许。
+  原始JSON保留源commit、排除results目录后的dirty标志、场景SHA-256与逐次KPI。
+- `scripts/analyze_contrast.py`：只分析已存JSON，生成报告、汇总CSV和三图；不重新仿真。
+  `scripts/export_contrast_study.py --write-study-doc`：复核990组合与CSV/JSON、原主结果blob，
+  用既有统计函数生成逐场景补充统计、参数快照及docs/11和标记内的数字表。
+- 配对为`(scenario, seed)`，差值=条件−proposed；Wilson95%、2000次配对bootstrap(seed=0)、
+  exact McNemar、Wilcoxon正态近似、边际分布Cliff’s delta；Holm限各条件内既定指标组，
+  不宣称全研究多重比较已控制，也不将噪声重复当作场景分布抽样。
+- 动力学敏感性结果保留后轴/质心原点混杂说明。Pacejka相对proposed同时改变动力学和轮胎；
+  不能将其统一对proposed的差值称为纯轮胎消融效应。
+- 完整测试实际为148项（包含15项基线算法、37项对比统计测试），本轮运行前后通过。
+  不改 `src/`、场景参数、测试或原 `results/benchmark*.csv/json`，不调参或删除负结果。

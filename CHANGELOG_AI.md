@@ -1,5 +1,25 @@
 # AI 修改记录
 
+## 2026-10-20 (独立30-seed基线与消融正式结果)
+
+- **源版本与范围**：冻结 `e0d7643a0941a651fb2ec8ffa712c77f0f3d26ff`，不重设计既有方案；
+  不修改src/、configs/、tests/、requirements.txt及原results/benchmark*.csv/json。
+- **修改/新增文件**：results/contrast/正式JSON、逐次/分组CSV、报告、三张PNG、逐场景补充统计、
+  参数/环境快照、验证记录与README；新增scripts/export_contrast_study.py（只分析/校验、不仿真）；
+  scripts/analyze_contrast.py仅调整散点图标签编号/布局以消除重叠，不修改统计逻辑；
+  校验器仅允许Git检出造成的LF/CRLF等价，保留原始指纹并另报本机字节一致性；
+  新增docs/11_baseline_and_ablation.md；更新README、docs/03/05/07/08、AI_SYSTEM_SPEC、历史交接状态及本记录。
+- **实验**：11条件×3场景×30 seeds(42–71)=990次，每次20 s/dt0.05，单进程、单线程BLAS、
+  Windows空闲优先级；原脚本的git_dirty=false、commit及场景SHA-256已核实，全部失败保留。
+- **结果口径**：表格由脚本从正式JSON生成；配对bootstrap、exact McNemar、Wilcoxon、
+  Cliff’s delta与条件内部Holm按既有实现计算；新增逐场景表但不覆盖原合并统计。
+  具体数值及负结果见docs/11，不复制历史冒烟数据。proposed为工程折中，不宣称全面最优。
+- **验证**：运行前后完整148项测试通过；git diff --check通过；990唯一组合/33组、
+  CSV与JSON、重算统计、源代码/配置不变、原主结果Git blob均校验通过（results/contrast/validation.json）。
+- **边界/未完成**：seeds仅改变感知噪声；跨模型后轴/质心原点未平移；计时固定条件顺序，
+  当前Windows及依赖版本与历史Mac和requirements上限不同；无真实轮胎/道路分布或硬实时保证。
+  Game活性、MPC安全、动力学停车与真实标定仍待后续修复，不能重写归档数据使其获胜。
+
 ## 2026-10-20 (文档修正：README 目录/CI 徽标/运动学保真度/cut-in TTC)
 
 - **修改文件**：`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/08_paper_draft.md`、`docs/09_slides_and_video_outline.md`、`AI_SYSTEM_SPEC.md`、`results/competition_pack/kpi_table.md`、`CHANGELOG_AI.md`。

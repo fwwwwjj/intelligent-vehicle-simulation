@@ -1,0 +1,39 @@
+{
+  "baseline_commit": "e0d7643a0941a651fb2ec8ffa712c77f0f3d26ff",
+  "status_before": "",
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "executable": "F:\\python\\python.exe",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+  "packages": {
+    "numpy": "2.2.2",
+    "scipy": "1.15.1",
+    "matplotlib": "3.10.0",
+    "PyYAML": "6.0.3"
+  },
+  "thread_env": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+  },
+  "threadpools": [
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 1,
+      "prefix": "libscipy_openblas",
+      "filepath": "F:\\python\\Lib\\site-packages\\numpy.libs\\libscipy_openblas64_-43e11ff0749b8cbe0a615c9cf6737e0e.dll",
+      "version": "0.3.28",
+      "threading_layer": "pthreads",
+      "architecture": "Haswell"
+    }
+  ],
+  "priority": "Windows IDLE_PRIORITY_CLASS (0x40), asserted in external launcher",
+  "original_benchmark_sha256": {
+    "results/benchmark.csv": "b9258287858b7d3d67f579a748fc8df5cfa4a0a7af36c88223d42ff5a7f1027e",
+    "results/benchmark.json": "7ae40944f280d51d7f2f8f34c224d49603bb4ff165bd5032811e1cb673d95162",
+    "results/benchmark_summary.csv": "362cc5fa9b742f0fa7de7a6d5a6aa290ab20be999e50f3866fbedcedc28f0113"
+  }
+}

@@ -1,0 +1,13 @@
+| condition | highway_merge | cut_in | emergency_avoidance | 合计 |
+| :--- | :--- | :--- | :--- | :--- |
+| proposed | 30/30 | 30/30 | 30/30 | 90/90 |
+| classical_baseline | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_game | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_idm | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_no_lane_change | 0/30 | 30/30 | 30/30 | 60/90 |
+| planner_em | 30/30 | 30/30 | 30/30 | 90/90 |
+| planner_centerline | 30/30 | 30/30 | 30/30 | 90/90 |
+| controller_pure_pursuit | 30/30 | 30/30 | 30/30 | 90/90 |
+| controller_mpc | 0/30 | 0/30 | 0/30 | 0/90 |
+| model_dynamic_2dof | 30/30 | 30/30 | 0/30 | 60/90 |
+| model_pacejka | 30/30 | 30/30 | 0/30 | 60/90 |

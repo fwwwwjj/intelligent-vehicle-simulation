@@ -10,7 +10,7 @@
 当前仓库包含很多模块，但“模块存在”不等于“实验有效”。审计发现：
 
 - `game_theoretic.py` 在 `highway_merge` 中 20 s 内没有完成汇入，不能支撑“Game 优于 FSM”的结论；
-- `em_planner.py`、`mpc_controller.py`、`tire.py` 的 Pacejka 分支只有单元/短时冒烟，没有多 seed 统计；
+- 当时 `em_planner.py`、`mpc_controller.py` 和 Pacejka 分支只有单元/冒烟；现已补齐独立990-run对照，结果与负例见[docs/11](11_baseline_and_ablation.md)，仍不代表完整安全验证；
 - `intersection_unprotected` 目前会驶出道路，不能作为“无保护左转已实现”的证据；
 - highD 只有格式解析器和合成微型样例，没有真实数据标定。
 
@@ -49,10 +49,10 @@
 
 | 模块 | 当前状态 | 为什么不纳入主结果 | 未来工作 |
 | :--- | :--- | :--- | :--- |
-| 博弈决策 `game_theoretic.py` | 有收益评估/信念更新原型；高速汇入会长时间礼让，20 s 内不汇入 | 任务不完成，FSM/Game 不可比 | 加 liveness/最大等待时间；形式化 players/actions/payoffs；30+ seeds 重评 |
-| EM/QP 规划 `em_planner.py` | 路径 QP + 速度 QP 原型；短时冒烟通过 | 未做多 seed、长时程统计；规划时延 p95 20–35 ms | 与 Lattice 做公平对比；约束/回退统计；实时性优化 |
-| LTV-MPC `mpc_controller.py` | 线性化误差模型 + QP；`lattice+MPC` 在 emergency 会撞车 | 安全闭环未通过 | 修 emergency stop；加终端约束/更长时域；与 LQR 对比 |
-| Pacejka `tire.py` | 稳态魔术公式 + 载荷转移 | 未做试验标定；与线性轮胎差异未统计 | 轮胎试验数据标定；与 2-DOF 主回路联调 |
+| 博弈决策 `game_theoretic.py` | 有收益评估/信念更新原型；高速汇入会长时间礼让，20 s 内不汇入 | 任务失败保留作负例；不能用未完成任务的低jerk声称优于FSM | 加 liveness/最大等待时间；形式化 players/actions/payoffs；在已归档30-seed负结果基础上重评 |
+| EM/QP 规划 `em_planner.py` | 路径/速度QP；已参加每场景30-seed补充对比 | 当前为固定场景下的折中观察，未完成泛化验证 | 基于docs/11优化实时性、约束与回退 |
+| LTV-MPC `mpc_controller.py` | 已参加30-seed补充对比，存在失败 | 安全闭环未通过，负结果保留 | 按失败诊断修复；新版本另行实验，不覆盖旧数据 |
+| Pacejka `tire.py` | 稳态魔术公式 + 载荷转移 | 已完成固定场景模型敏感性对照；未做试验标定；跨模型有原点混杂 | 轮胎试验数据标定；与 2-DOF 主回路联调 |
 | 交叉口 `intersection_unprotected` | 拓扑/场景存在；车辆会冲过路口并驶出道路 | 任务不完成；决策层用中位数 y，看不到对向冲突车 | 局部 Frenet 车道查询；冲突点/路权；曲率限速 |
 | MOBIL 换道 | 已接入 `ObstacleManager.step()`，高速汇入启用 | 未做换道安全性统计 | 多场景换道安全/舒适统计 |
 | highD 真实标定 | **highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补**：跟驰样本提取 + IDM 标定 + 开环回放脚本已提供 | 无真实数据运行结果 | 下载 highD 子集并运行 `scripts/calibrate_highd.py` / `replay_highd.py`；全量生产标定仍未来工作 |
@@ -72,15 +72,15 @@
 - 任务级 success 的定义与实现；
 - 3 个核心场景、30 seeds 的闭环结果（论文目标 30–50 seeds）；
 - 与“只报碰撞”的评测相比，任务级判据能识别“未汇入/驶出道路”的假成功；
-- 复杂算法作为 future work 的路线图。
+- 复杂模块的补充对比与负结果（docs/11），以及后续修复/标定/泛化路线图。
 
 ### 4.2 不能写的
 
 - “Game 比 FSM 舒适性提升 50.4%”；
-- “EM/QP、MPC、Pacejka 已完成多 seed 验证”；
+- “EM/QP、MPC、Pacejka 已通过完整安全验证或真实标定”；
 - “城市无保护左转已实现”；
 - “基于 highD 真实数据标定”；
-- “统计显著优于基线”（当前只有 30 seeds，且无基线对比）。
+- “对真实道路场景分布统计显著优于基线”（现有对照只扰动三个固定场景的感知噪声）。
 
 ---
 
@@ -118,4 +118,14 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `docs/08` | 论文草稿：核心链路、任务指标、30-seed 结果与局限 |
 | `docs/09` | 答辩 PPT 与演示视频大纲 |
 | `docs/10` | highD 最小可信版：标定 + 开环回放 |
+| `docs/11` | 独立990-run基线/消融；逐场景统计、负结果、复现与局限 |
 | `AI_SYSTEM_SPEC.md` | SSOT：接口/量纲/验收口径 |
+
+
+## 7. 本轮范围更新：实验覆盖不等于能力验收
+
+11-condition、每场景30-seed对比已完成，结果独立归档于 `results/contrast/`。
+这补齐了基线/消融证据，原核心主结果和实验性开关保持不变。
+Game/EM/MPC/Pacejka可以在论文补充实验中讨论结果与失败，但不能因此提升为
+“已通过安全/泛化/真实标定验收”。具体数值仅引用[docs/11](11_baseline_and_ablation.md)。
+后续重点是场景参数扰动、模型位姿原点一致性、失败根因与真实数据，而非只增加相同场景的噪声seeds。

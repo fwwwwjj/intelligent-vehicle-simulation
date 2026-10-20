@@ -1,6 +1,6 @@
 # 第三部分：结果演示分析与说明
 
-> **范围说明（v0.4-core，2026-10-20）**：本部分只报告当前核心链路 **HFSM + Frenet Lattice + LQR + 运动学模型** 在三个核心场景上的可复现结果。博弈决策、EM/QP、LTV-MPC、Pacejka 轮胎与城市无保护路口属于**未来工作/探索性模块**，不纳入本部分的主结果；详见 [07_scope_and_future_work.md](07_scope_and_future_work.md)。
+> **范围说明（v0.4-core，2026-10-20）**：§3保留原主结果；新增§8单列基线/消融补充实验。核心链路 **HFSM + Frenet Lattice + LQR + 运动学模型** 在三个核心场景上提供可复现结果。博弈决策、EM/QP、LTV-MPC、Pacejka 轮胎与城市无保护路口属于**未来工作/探索性模块**，不纳入本部分的主结果；详见 [07_scope_and_future_work.md](07_scope_and_future_work.md)。
 
 ---
 
@@ -148,23 +148,23 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 ## 5. 当前局限
 
-- **样本量**：30 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
+- **统计边界**：补充实验已完成每条件30 seeds、配对检验及效应量；这些 seeds 只改变感知噪声，场景参数分布仍未覆盖，不能仅增加 seeds 就宣称泛化。
 - **场景多样性**：三个核心场景都是结构化道路/合成交通；highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补。
 - **车辆模型/保真度**：核心链路使用**运动学自行车模型**，不含轮胎侧滑、载荷转移、悬架/制动动力学，也没有传感器/执行器硬件延迟；因此它是决策—规划—控制逻辑与任务级 KPI 的仿真基线，**不是高保真车辆动力学仿真**。横向加速度、舒适性与安全间距结论是模型级结论；2-DOF + Pacejka 属于未来工作。
 - **控制**：LQR 的横向加速度已限制在 2.5 m/s² 附近；但高速换道的舒适性仍有优化空间。
-- **规划**：Lattice 只做单时域采样；EM/QP 属于未来工作。
+- **规划**：Lattice 只做单时域采样；EM/QP 已在补充实验中对照，仍为实验性，折中见§8。
 - **决策**：核心只使用 FSM；Game 当前未完成汇入，不能作为主结果。
 - **时延**：单机实测，未做硬实时保证；论文需报告硬件和 p95/p99。
-- **YAML 路径**：当前基准环境未安装 PyYAML，`load_named_scenario` 走内置 dict；安装 `requirements.txt` 后应重跑一次，确认 YAML 与内置场景一致。
+- **配置路径**：历史主结果的环境说明保持原样；本次补充实验安装了 PyYAML 6.0.3，实际读取 YAML，场景与全局配置指纹分别记录在 JSON 和参数快照中，148项测试包含内置/YAML一致性检查。两批结果不合并。
 
 ---
 
 ## 6. 未来工作（不纳入本部分主结果）
 
-1. **博弈决策**：修复 Game 汇入死锁；形式化 players/actions/payoffs；30+ seeds 与 FSM 对比。
-2. **EM/QP**：与 Lattice 做公平对比；统计规划时延与回退率。
-3. **LTV-MPC**：修复 emergency stop；与 LQR 对比。
-4. **Pacejka**：轮胎试验标定；与线性轮胎对比。
+1. **博弈决策**：修复Game汇入死锁；形式化players/actions/payoffs，在归档负结果基础上扩展场景参数分布。
+2. **EM/QP**：已完成补充对比，继续优化时延/回退并扩展场景分布。
+3. **LTV-MPC**：补充对比保留失败结果，继续修复紧急制动和跟踪安全性。
+4. **Pacejka**：补充敏感性对照已完成，跨模型原点口径与真实轮胎标定仍待解决。
 5. **城市无保护路口**：局部 Frenet 车道查询、冲突点/路权、曲率限速。
 6. **真实数据**：highD 子集标定/回放；INTERACTION/NGSIM 接入。
 7. **联合仿真**：OpenSCENARIO/ROS/CARLA。
@@ -193,3 +193,23 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 > 这是**最小可信版**：只做同车道跟驰标定 + 开环回放，不做闭环交互，也不做全量生产标定。`data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，不能写成真实数据结论。详见 [10_highd_calibration_replay.md](10_highd_calibration_replay.md)。
 
 在论文中，这一节应放在“数据来源/实验设置”，并如实写出 recording ID、时间窗、样本数、许可；不能把开环回放写成“真实车流闭环验证”。
+
+
+---
+
+## 8. 基线与组件消融补充实验（与§3历史主结果分列）
+
+正式实验已完成11个条件×3个场景×seeds42–71，共990次、每次20 s，未修改原
+`results/benchmark*.csv/json`。实验源版本为 `e0d7643`，运行结束时 `git_dirty=false`
+（按原脚本排除结果目录），场景SHA-256已验证。
+
+条件矩阵、完整30-seed数值表、成功率Wilson区间、配对bootstrap区间、
+McNemar/Wilcoxon/Holm检验、效应量与失败诊断统一见
+[11_baseline_and_ablation.md](11_baseline_and_ablation.md)。原始产物及环境/复现命令见
+[results/contrast/README.md](../results/contrast/README.md)。本次运行使用Windows空闲优先级、
+单进程与单线程BLAS；没有并行benchmark。历史Mac主结果与本次Windows时延不可直接比较。
+
+proposed 应理解为任务成功、舒适性与时延的工程折中。经典基线不做换道；
+Game/MPC的失败、动力学模型的停车任务差异均保留。中心线规划即使在当前场景通过，
+也不具有障碍物搜索能力。模型切换存在后轴/质心原点混杂，不能全部归因于轮胎保真度。
+30个seeds只扰动传感器噪声，不能宣称对道路场景分布统计显著。

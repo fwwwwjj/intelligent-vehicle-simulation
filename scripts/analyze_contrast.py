@@ -227,8 +227,10 @@ def plot_safety_comfort(summary: Mapping[str, Any], output_dir: Path, dpi: int =
         "ablation": "#d62728",
         "unknown": "#7f7f7f",
     }
-    figure, axis = plt.subplots(figsize=(7.5, 5.0))
+    figure, axis = plt.subplots(figsize=(13.5, 6.0))
     plotted = 0
+    points = []
+    handles = []
     for name, entry in sorted(by_condition.items()):
         if not isinstance(entry, Mapping):
             continue
@@ -239,29 +241,50 @@ def plot_safety_comfort(summary: Mapping[str, Any], output_dir: Path, dpi: int =
         family = str(entry.get("family") or "unknown")
         color = family_colors.get(family, family_colors["unknown"])
         axis.scatter([safety], [comfort], s=70, color=color, edgecolor="black", zorder=3)
-        axis.annotate(
-            str(name),
-            xy=(safety, comfort),
-            xytext=(5, 4),
-            textcoords="offset points",
-            fontsize=6.5,
-            color=color,
-        )
         plotted += 1
+        points.append((plotted, safety, comfort, color))
+        handles.append(plt.Line2D(
+            [], [], marker="o", linestyle="", color=color,
+            label="{}: {} ({})".format(plotted, name, family),
+        ))
     if plotted == 0:
         plt.close(figure)
         return None
     axis.set_xlabel("Mean min obstacle distance (m) — higher is safer")
     axis.set_ylabel("Mean RMS jerk (m/s^3) — lower is more comfortable")
-    axis.set_title("Safety–comfort trade-off by condition (aggregated over scenarios)")
+    axis.set_title("Safety–comfort trade-off (fixed-scenario aggregate)")
     axis.grid(alpha=0.3)
-    handles = [
-        plt.Line2D([], [], marker="o", linestyle="", color=color, label=family)
-        for family, color in family_colors.items()
-        if family != "unknown"
-    ]
-    axis.legend(handles=handles, fontsize=8)
+    axis.legend(handles=handles, fontsize=7.5, loc="upper left",
+                bbox_to_anchor=(1.02, 1.0), title="Condition ID / family")
     figure.tight_layout()
+    # Numbered callouts keep identical/near-identical conditions visible without
+    # moving their data points. Select offsets in final display coordinates.
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    occupied = []
+    offsets = ((8, 8), (8, -18), (-22, 8), (-22, -18),
+               (8, 28), (8, -38), (-22, 28), (-22, -38), (28, 8))
+    for identifier, safety, comfort, color in points:
+        for offset in offsets:
+            label = axis.annotate(
+                str(identifier), xy=(safety, comfort), xytext=offset,
+                textcoords="offset points", fontsize=8, color=color,
+                bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": color, "alpha": 0.95},
+                arrowprops={"arrowstyle": "-", "color": color, "lw": 0.5},
+            )
+            label.update_positions(renderer)
+            label.update_bbox_position_size(renderer)
+            bounds = label.get_bbox_patch().get_window_extent(renderer).expanded(1.2, 1.2)
+            inside = axis.bbox.contains(bounds.x0, bounds.y0) and axis.bbox.contains(bounds.x1, bounds.y1)
+            if inside and not any(bounds.overlaps(previous) for previous in occupied):
+                occupied.append(bounds)
+                break
+            label.remove()
+        else:
+            # The legend still identifies every condition if a dense cluster
+            # exhausts the small set of offsets.
+            axis.annotate(str(identifier), (safety, comfort), xytext=(8, 48),
+                          textcoords="offset points", fontsize=8, color=color)
     path = output_dir / "contrast_safety_comfort.png"
     figure.savefig(path, dpi=dpi)
     plt.close(figure)

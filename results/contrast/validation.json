@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "n_runs": 990,
+  "n_groups": 33,
+  "source_commit": "e0d7643a0941a651fb2ec8ffa712c77f0f3d26ff",
+  "main_result_git_blobs": {
+    "results/benchmark.csv": "90c90a4898641006f09610cc648ce7e37f172825",
+    "results/benchmark.json": "3a48069bb3fdba92e86f2c111b806833bcc4e707",
+    "results/benchmark_summary.csv": "8f989cb15bba046b41f58c833583f37144c2cc43"
+  },
+  "main_result_raw_sha256_verified": {
+    "results/benchmark.csv": {
+      "actual_sha256": "b9258287858b7d3d67f579a748fc8df5cfa4a0a7af36c88223d42ff5a7f1027e",
+      "recorded_sha256": "b9258287858b7d3d67f579a748fc8df5cfa4a0a7af36c88223d42ff5a7f1027e",
+      "exact_original_bytes": true
+    },
+    "results/benchmark.json": {
+      "actual_sha256": "7ae40944f280d51d7f2f8f34c224d49603bb4ff165bd5032811e1cb673d95162",
+      "recorded_sha256": "7ae40944f280d51d7f2f8f34c224d49603bb4ff165bd5032811e1cb673d95162",
+      "exact_original_bytes": true
+    },
+    "results/benchmark_summary.csv": {
+      "actual_sha256": "362cc5fa9b742f0fa7de7a6d5a6aa290ab20be999e50f3866fbedcedc28f0113",
+      "recorded_sha256": "362cc5fa9b742f0fa7de7a6d5a6aa290ab20be999e50f3866fbedcedc28f0113",
+      "exact_original_bytes": true
+    }
+  },
+  "original_main_table_rows_sha256": {
+    "README.md": "e4676f31fcbcb7f534432072e342970678da954097e1f4acd74c52d2962e7261",
+    "docs/03_results_and_demo.md": "371291cd8b6cfe0129887df06bf082e94e4ac653807665b67119cf56b85b5801",
+    "docs/08_paper_draft.md": "9f5bc1babd23d87d0c731bd7e310d10c168c058c7c39eaab1f7fc431cc8a690a"
+  },
+  "archived_test_evidence": {
+    "tests_before.log": {
+      "n_tests": 148,
+      "status": "OK",
+      "duration_s": 16.594,
+      "sha256": "1702e6e0932018bf965ebbca5f3d8ee8073689bc6af410a18922e72d6ba1ae99"
+    },
+    "tests_after.log": {
+      "n_tests": 148,
+      "status": "OK",
+      "duration_s": 16.499,
+      "sha256": "a420b6f4b773374183728d7b3b67947c26f0076d374ba919bed2552e80dd8a3b"
+    }
+  },
+  "checks": [
+    "complete unique Cartesian product",
+    "20-second observations",
+    "finite nonnegative KPIs and success implies no collision/departure",
+    "resolved stack matches condition",
+    "metadata clean and scene hashes valid",
+    "raw and summary CSV equality (checkout LF/CRLF only ignored)",
+    "summary and pooled statistics reproduced",
+    "simulation source/config/tests unchanged",
+    "original main result blobs unchanged",
+    "original README/docs core result rows preserved"
+  ]
+}

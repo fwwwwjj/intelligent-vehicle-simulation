@@ -6,7 +6,7 @@
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![CI](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml)
 
-> 本地测试：96 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
+> 本地测试：148 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
 >
 > 本项目为**中国仿真创新应用大赛**参赛项目。当前版本（v0.4-core）聚焦一条**可运行、可验证、可复现**的闭环主链：
 >
@@ -16,6 +16,8 @@
 >
 > 博弈决策、EM/QP、LTV-MPC、Pacejka 轮胎、城市无保护路口、全量 highD 标定、OpenSCENARIO/ROS/CARLA 联仿属于**未来工作/探索性模块**：代码与接口保留，但不纳入当前主结果。范围说明见 [docs/07_scope_and_future_work.md](docs/07_scope_and_future_work.md)。
 
+> **新增对比证据**：11 conditions × 3 scenarios × 30 seeds 的 990 次补充实验已完成，见 [基线与消融报告](docs/11_baseline_and_ablation.md)。Game/EM/MPC/Pacejka 保持实验性标记；它们已参与补充对比，安全性与标定仍待完善。原主结果未重跑或覆盖。
+>
 > 📖 **开发者与 AI 协作规范**：坐标系、变量口径、接口契约与验收标准见 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)。
 
 ---
@@ -42,7 +44,7 @@
 | **2. 数字模型或系统** | [docs/02_digital_models.md](docs/02_digital_models.md) | `src/vehicle_model/`（运动学）、`src/decision/`（FSM）、`src/planning/`（Lattice）、`src/control/`（LQR/PID） |
 | **3. 结果演示分析或说明** | [docs/03_results_and_demo.md](docs/03_results_and_demo.md) | `src/evaluation/metrics.py`、`src/visualization/`、`results/`（JSON/CSV/KPI） |
 | **4. 应用说明与工程落地** | [docs/04_application.md](docs/04_application.md) | `src/simulator.py`（MIL/SIL 闭环、教学实验） |
-| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、96 项本地测试、标准与文献列表 |
+| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、148 项本地测试、标准与文献列表 |
 
 > 复杂算法（Game/EM/MPC/Pacejka/交叉口）的说明保留在 [docs/06_qp_mpc_em_pacejka.md](docs/06_qp_mpc_em_pacejka.md)，并在 [docs/07_scope_and_future_work.md](docs/07_scope_and_future_work.md) 中明确标为未来工作。
 
@@ -89,7 +91,8 @@ intelligent-vehicle-simulation/
 │   ├── 07_scope_and_future_work.md  # 当前范围与未来工作清单
 │   ├── 08_paper_draft.md       # 论文草稿（v0.4-core）
 │   ├── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
-│   └── 10_highd_calibration_replay.md  # highD 最小可信版
+│   ├── 10_highd_calibration_replay.md  # highD 最小可信版
+│   └── 11_baseline_and_ablation.md  # 990-run 补充对比与负结果
 ├── src/
 │   ├── common/                 # 状态、Frenet、OBB-SAT、QP 后端
 │   ├── environment/            # 路网、场景加载、IDM/MOBIL、highD 解析、标定
@@ -102,7 +105,7 @@ intelligent-vehicle-simulation/
 │   ├── runner.py               # 场景 → 算法装配工厂
 │   └── simulator.py            # 闭环仿真主引擎
 ├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
-├── tests/                      # 96 项单元/闭环测试
+├── tests/                      # 148 项单元/闭环测试
 └── results/                    # 30-seed 核心基准 JSON/CSV、归档
 ```
 
@@ -129,10 +132,10 @@ intelligent-vehicle-simulation/
 
 | 模块 | 当前状态 | 未来工作 |
 | :--- | :--- | :--- |
-| 博弈决策 | 收益评估/信念更新原型；高速汇入 20 s 内未完成汇入 | 修复汇入死锁；形式化博弈；30+ seeds 对比 |
-| EM/QP | 路径 QP + 速度 QP 原型 | 与 Lattice 公平对比；时延/回退统计 |
-| LTV-MPC | 线性化误差模型 + QP；紧急制动会撞车 | 修 emergency stop；与 LQR 对比 |
-| Pacejka | 稳态魔术公式原型 | 轮胎试验标定；与线性轮胎对比 |
+| 博弈决策 | 收益评估/信念更新原型；高速汇入 20 s 内未完成汇入 | 补充对比已完成；修复汇入死锁并扩展场景参数扰动 |
+| EM/QP | 已参加 30-seed 补充对比，仍为实验性 | 分析安全/舒适/时延折中；实时性与回退优化 |
+| LTV-MPC | 已参加补充对比，存在闭环失败 | 按失败诊断修复安全性，保持结果归档 |
+| Pacejka | 已有 30-seed 模型敏感性对照，未真实标定 | 修正跨模型位姿口径；轮胎试验标定 |
 | 城市无保护路口 | 拓扑存在；车辆会驶出道路 | 局部 Frenet、冲突点/路权、曲率限速 |
 | highD 真实标定 | highD 格式解析 + 最小可信版脚本已就绪，真实 recording 结果待补 | 下载真实 recording 运行脚本；全量生产标定仍未来工作 |
 | OpenSCENARIO/ROS/CARLA | 占位/路线图 | 后续工程化 |
@@ -180,7 +183,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B -m unittest discover tests -v
 ```
 
-当前 **96 项测试**，约 10–20 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
+当前 **148 项测试**，约 10–20 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
 
 ### 4. 运行核心基准（低功耗，30 seeds）
 
@@ -248,6 +251,30 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 
 ---
 
+### 6.1 补充基线与消融结果
+
+以下数值由 `scripts/export_contrast_study.py` 从正式 JSON 生成。各格为任务成功数；每场景30次，合计90次。条件全称、Wilson区间、连续指标、配对统计和负结果见 [docs/11](docs/11_baseline_and_ablation.md)。本次 Windows 时延不与上表历史 Mac 时延直接比较。
+
+<!-- BEGIN CONTRAST RESULTS -->
+
+| condition | highway_merge | cut_in | emergency_avoidance | 合计 |
+| :--- | :--- | :--- | :--- | :--- |
+| proposed | 30/30 | 30/30 | 30/30 | 90/90 |
+| classical_baseline | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_game | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_idm | 0/30 | 30/30 | 30/30 | 60/90 |
+| decision_no_lane_change | 0/30 | 30/30 | 30/30 | 60/90 |
+| planner_em | 30/30 | 30/30 | 30/30 | 90/90 |
+| planner_centerline | 30/30 | 30/30 | 30/30 | 90/90 |
+| controller_pure_pursuit | 30/30 | 30/30 | 30/30 | 90/90 |
+| controller_mpc | 0/30 | 0/30 | 0/30 | 0/90 |
+| model_dynamic_2dof | 30/30 | 30/30 | 0/30 | 60/90 |
+| model_pacejka | 30/30 | 30/30 | 0/30 | 60/90 |
+
+<!-- END CONTRAST RESULTS -->
+
+proposed 是任务成功、舒适性与计算时延的折中；固定三个场景的噪声 seeds 不代表道路场景分布。所有失败均纳入统计，未为获胜调参。
+
 ## 七、 当前实现边界
 
 **仿真保真度（重要）：** 核心使用**运动学自行车模型**，不含轮胎侧滑、载荷转移、悬架/制动动力学，也没有传感器/执行器硬件延迟。因此它是“决策—规划—控制逻辑 + 任务级 KPI”的仿真基线，**不是高保真车辆动力学仿真，也不是 HIL**。本文的横向加速度、舒适性和安全间距结论都是模型级结论，不能外推为真实车辆极限；2-DOF + Pacejka 属于未来工作。
@@ -261,7 +288,7 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 - IDM 跟驰与脚本化 cut-in；
 - 任务级 KPI：碰撞、净距、TTC、Jerk、横向/航向误差、决策/规划/控制时延、任务成功/完成时间/驶出道路；
 - 三个核心场景、YAML/JSON/内置场景加载、seed 复现；
-- 30-seed 基准与 JSON/CSV 结果。
+- 原 30-seed 核心基准与独立 990-run 基线/消融 JSON/CSV/统计报告。
 
 **未来工作（不纳入当前主结果）：**
 
@@ -277,7 +304,7 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 **不能写的表述：**
 
 - “Game 比 FSM 舒适性提升 50.4%”（当前 Game 未完成汇入，不可比）；
-- “EM/QP、MPC、Pacejka 已完成多 seed 验证”；
+- “EM/QP、MPC、Pacejka 已通过完整安全验证或真实轮胎标定”；
 - “城市无保护左转已实现”；
 - “基于 highD 真实数据标定”；
 - “统计显著优于基线”。
@@ -286,14 +313,14 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 
 ## 八、 未来工作
 
-1. **博弈决策**：修复 Game 汇入死锁；形式化 players/actions/payoffs；加 liveness/最大等待时间；30+ seeds 与 FSM 对比。
-2. **EM/QP**：与 Lattice 做公平对比；统计规划时延、回退率、约束违反。
+1. **博弈决策**：修复 Game 汇入死锁；形式化 players/actions/payoffs；加 liveness/最大等待时间；在已归档负结果基础上扩展场景参数扰动。
+2. **EM/QP**：基于已完成对照优化规划时延、回退与约束处理，扩展场景分布。
 3. **LTV-MPC**：修复 emergency stop；加终端约束/更长时域；与 LQR 对比。
 4. **Pacejka**：轮胎试验标定；与线性轮胎对比。
 5. **城市无保护路口**：局部 Frenet 车道查询、冲突点/路权、曲率限速。
 6. **真实数据**：highD 子集标定/回放；INTERACTION/NGSIM 接入。
 7. **联合仿真**：OpenSCENARIO/ROS/CARLA。
-8. **大规模统计**：30–50 seeds、参数扰动、SOTIF 边界场景。
+8. **场景泛化**：场景参数扰动、SOTIF 边界场景与跨平台复核；增加噪声 seeds 不能替代场景多样性。
 
 详见 [docs/07_scope_and_future_work.md](docs/07_scope_and_future_work.md)。
 

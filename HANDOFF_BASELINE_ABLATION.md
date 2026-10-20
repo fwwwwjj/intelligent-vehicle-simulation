@@ -1,4 +1,8 @@
-# 交接说明：基线对比与消融实验（未完成）
+# 交接说明：基线对比与消融实验（历史交接，正式结果已完成）
+
+> 最新状态：990次正式运行、报告/图表/文档已完成，见 `results/contrast/README.md` 与 `docs/11_baseline_and_ablation.md`。下面保留原始执行前交接，不能将其中冒烟数字当作正式结果；Git推送状态以实际远端为准。
+
+## 原始交接（历史记录）
 
 > 状态：**代码已实现、单元/闭环冒烟通过；全量实验和文档尚未完成**。
 > 交接时间：2026-10-20。原机器因长时间仿真发热，任务暂停。
@@ -161,3 +165,8 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 - 本文件 `HANDOFF_BASELINE_ABLATION.md`
 
 **换电脑前**：本 commit 已推到 GitHub 的 `main`；在另一台电脑 `git clone`/`git pull` 即可。若推送失败，则整目录拷贝（含 `.git`）。
+
+
+## 后续交付状态（2026-10-20）
+
+上述未完成事项已由独立30-seed正式实验补齐：990次运行、报告、三图、逐场景统计与文档见 `results/contrast/README.md` 和 `docs/11_baseline_and_ablation.md`。上述 `/tmp` 数据及冒烟观察仅为历史记录，不是正式结果来源。Git交付状态以当前提交及实际远端为准。
