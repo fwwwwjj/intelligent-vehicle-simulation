@@ -185,28 +185,55 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
 
         target_lead, target_lead_gap = self._find_lead(ego_state, obstacles, target_lane)
         target_follower, follower_gap = self._find_follower(ego_state, obstacles, target_lane)
-        distance = target_lead_gap if target_lead is not None else 100.0
-        delta_v = ego_state.velocity - (target_lead.vx if target_lead is not None else ego_state.velocity)
-        # follower_closing > 0 表示后车正在逼近（比自车快）
+
+        # 1. 目标车道前导车交互收益
+        dist_lead = target_lead_gap if target_lead is not None else 100.0
+        rel_v_lead = ego_state.velocity - (target_lead.vx if target_lead is not None else ego_state.velocity)
+        if target_lead is not None and target_lead_gap < 12.0:
+            u_lead_merge = -50.0  # 距离前车过近，切入存在碰撞风险
+        else:
+            u_lead_merge = min(
+                self.calculate_payoff("merge", "pass", dist_lead, rel_v_lead),
+                self.calculate_payoff("merge", "yield", dist_lead, rel_v_lead),
+            )
+        u_lead_yield = min(
+            self.calculate_payoff("yield", "pass", dist_lead, rel_v_lead),
+            self.calculate_payoff("yield", "yield", dist_lead, rel_v_lead),
+        )
+
+        # 2. 目标车道后随车博弈收益
         follower_closing = (
             target_follower.vx - ego_state.velocity if target_follower is not None else 0.0
         )
+        if target_follower is not None:
+            risk_foll = max(0.0, 18.0 - follower_gap) * max(0.0, follower_closing) * 0.25
+            # 主车汇入：若后车不礼让 (pass) 且正高速逼近，产生极高安全惩罚
+            u_foll_merge_pass = (
+                self.w_s * (10.0 - (100.0 if (follower_gap < 15.0 and follower_closing > 0.5) else risk_foll))
+                + self.w_e * 20.0
+                + self.w_c * 8.0
+            )
+            # 主车汇入：若后车减速礼让 (yield)，通行顺畅
+            u_foll_merge_yield = self.w_s * 10.0 + self.w_e * 20.0 + self.w_c * 8.0
+            u_foll_merge = min(u_foll_merge_pass, u_foll_merge_yield)
 
-        # 主车收益：对背景车两种反应取最坏情况
-        u_merge = min(
-            self.calculate_payoff("merge", "pass", distance, delta_v),
-            self.calculate_payoff("merge", "yield", distance, delta_v),
-        )
-        u_yield = min(
-            self.calculate_payoff("yield", "pass", distance, delta_v),
-            self.calculate_payoff("yield", "yield", distance, delta_v),
-        )
+            # 主车礼让等待：后车通过，主车安全有保障
+            u_foll_yield_pass = self.w_s * 10.0 + self.w_e * 8.0 + self.w_c * 10.0
+            u_foll_yield_yield = self.w_s * 10.0 + self.w_e * 6.0 + self.w_c * 10.0
+            u_foll_yield = min(u_foll_yield_pass, u_foll_yield_yield)
 
-        # 硬安全约束：目标车道后车过近且正在逼近时，不允许汇入
-        rear_unsafe = target_follower is not None and (
-            (follower_gap < 20.0 and follower_closing > 1.0) or follower_gap < 5.0
+            u_merge = min(u_lead_merge, u_foll_merge)
+            u_yield = min(u_lead_yield, u_foll_yield)
+        else:
+            u_merge = u_lead_merge
+            u_yield = u_lead_yield
+
+        # 硬安全约束防线
+        rear_hard_unsafe = target_follower is not None and (
+            follower_gap < 5.0 or (follower_gap < 12.0 and follower_closing > 1.0)
         )
-        can_merge = (u_merge > u_yield) and not rear_unsafe
+        lead_hard_unsafe = target_lead is not None and target_lead_gap < 10.0
+        can_merge = (u_merge > u_yield) and not rear_hard_unsafe and not lead_hard_unsafe
 
         if can_merge:
             target_speed = self.desired_speed
@@ -223,14 +250,25 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
                 ),
             )
 
-        reason = "rear unsafe" if rear_unsafe else f"u_yield={u_yield:.1f} >= u_merge={u_merge:.1f}"
-        target_speed = self.desired_speed
+        # 战术礼让：主动调节车速，创造安全汇入窗口
+        if target_follower is not None and follower_closing > -1.0:
+            yield_speed = max(14.0, min(ego_state.velocity, target_follower.vx - 3.0))
+        elif target_lead is not None and target_lead_gap < 15.0:
+            yield_speed = min(self.desired_speed, max(12.0, target_lead.vx))
+        else:
+            yield_speed = self.desired_speed
         if current_lead is not None:
-            target_speed = min(current_lead.vx, self.desired_speed)
+            yield_speed = min(yield_speed, current_lead.vx)
+
+        reason = (
+            "rear unsafe"
+            if rear_hard_unsafe
+            else ("lead unsafe" if lead_hard_unsafe else f"u_yield={u_yield:.1f} >= u_merge={u_merge:.1f}")
+        )
         return DecisionOutput(
             intent=DrivingIntent.YIELD,
             target_lane_id=current_lane_id,
-            target_speed=target_speed,
+            target_speed=yield_speed,
             lead_obstacle_id=current_lead.id if current_lead else None,
-            reasoning_log=f"Nash choice=yield ({reason})",
+            reasoning_log=f"Nash choice=yield ({reason}, yield_v={yield_speed:.1f})",
         )

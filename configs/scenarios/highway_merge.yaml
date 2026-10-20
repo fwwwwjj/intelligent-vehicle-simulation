@@ -29,9 +29,13 @@ obstacles:
   - id: "obs_rear_main"
     type: "car"
     initial_state: {x: -15.0, y: 0.0, v: 22.0, heading: 0.0, lane_id: "main_lane_0"}
-    behavior_type: "idm"       # 智能驾驶员跟驰模型
+    behavior_type: "idm"       # 智能驾驶员跟驰模型，向主车逼近
     idm_params: {desired_speed: 24.0, s0: 4.0, T: 1.5, a_max: 2.0, b_desired: 2.5}
+  - id: "obs_block_left"
+    type: "car"
+    initial_state: {x: -15.0, y: 3.75, v: 22.0, heading: 0.0, lane_id: "main_lane_1"}
+    behavior_type: "constant_speed"
   - id: "obs_fast_left"
     type: "car"
-    initial_state: {x: 40.0, y: 3.75, v: 28.0, heading: 0.0, lane_id: "main_lane_1"}
+    initial_state: {x: 35.0, y: 3.75, v: 26.0, heading: 0.0, lane_id: "main_lane_1"}
     behavior_type: "constant_speed"

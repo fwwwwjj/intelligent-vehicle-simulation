@@ -180,9 +180,19 @@ class ObstacleManager:
         if idm is None:
             return None
 
-        # 优先考虑左右车道
-        candidate_ys = [obs.y + self.lane_width, obs.y - self.lane_width]
+        # 优先考虑左右车道（限制在主线车道范围内，避免背景车违规向匝道换道）
+        candidate_ys = [y for y in (obs.y + self.lane_width, obs.y - self.lane_width) if y >= -1e-3]
         for target_y in candidate_ys:
+            # 空间几何间距初检：防止目标车道并排侧撞或侵入盲区安全间距
+            has_side_collision = any(
+                other.id != obs.id
+                and abs(other.y - target_y) <= 0.5 * (obs.width + other.width) + 0.5
+                and abs(other.x - obs.x) < 0.5 * (obs.length + other.length) + idm.s0
+                for other in self.obstacles.values()
+            )
+            if has_side_collision:
+                continue
+
             target_lead = self._find_lead_at_y(obs, target_y)
             target_follower = self._find_follower_at_y(obs, target_y)
 
