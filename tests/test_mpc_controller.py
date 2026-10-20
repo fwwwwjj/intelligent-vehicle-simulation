@@ -123,6 +123,50 @@ class TestMPCController(unittest.TestCase):
         self.assertLess(state.vx, 14.0)
         self.assertGreater(state.vx, 8.0)
 
+    def test_warm_start_sequence_shifting_and_dual_retention(self):
+        controller = MPCController()
+        state = VehicleState(x=0.0, y=0.2, heading=0.01, velocity=12.0, vx=12.0)
+        traj = _straight_trajectory(12.0)
+
+        # 初始步（冷启动）
+        cmd1 = controller.compute_control(state, traj, dt=0.05)
+        self.assertTrue(controller.last_solve_info["success"])
+        self.assertIsNotNone(controller._warm_start_x)
+        self.assertIsNotNone(controller._warm_start_y)
+        iter_cold = controller.last_solve_info["iterations"]
+
+        # 连续滚动第 2 步（热启动，时域向后平移）
+        state2 = VehicleState(x=0.6, y=0.15, heading=0.008, velocity=12.0, vx=12.0)
+        cmd2 = controller.compute_control(state2, traj, dt=0.05)
+        self.assertTrue(controller.last_solve_info["success"])
+        self.assertIsNotNone(controller._warm_start_x)
+        self.assertIsNotNone(controller._warm_start_y)
+
+        # 重置后应彻底清空热启动缓存
+        controller.reset()
+        self.assertIsNone(controller._warm_start_x)
+        self.assertIsNone(controller._warm_start_y)
+        self.assertIsNone(controller._warm_start_u)
+
+    def test_lateral_adhesion_soft_protection_limits_steer_rate(self):
+        controller = MPCController(max_steer_rate=1.0, friction_coefficient=0.8)
+        traj = _curved_trajectory(speed=12.0, kappa=0.04)
+
+        # 状态 1：低侧向力附着工况
+        calm_state = VehicleState(x=0.0, y=0.0, heading=0.0, velocity=12.0, vx=12.0, ay=0.0, yaw_rate=0.0)
+        controller.reset()
+        cmd_calm = controller.compute_control(calm_state, traj, dt=0.05)
+        delta_calm = abs(cmd_calm.steering_angle)
+
+        # 状态 2：高侧偏极端工况（接近地面附着极限 mu * g = 0.8 * 9.81 = 7.85 m/s^2）
+        aggressive_state = VehicleState(x=0.0, y=0.0, heading=0.0, velocity=12.0, vx=12.0, ay=6.8, yaw_rate=0.55)
+        controller.reset()
+        cmd_aggr = controller.compute_control(aggressive_state, traj, dt=0.05)
+        delta_aggr = abs(cmd_aggr.steering_angle)
+
+        # 附着软保护触发后，转向角增量上限应被平滑压缩
+        self.assertLess(delta_aggr, delta_calm + 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

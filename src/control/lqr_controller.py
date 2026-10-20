@@ -71,6 +71,9 @@ class LQRController(BaseController):
         max_jerk: float = 4.0,
         max_lateral_accel: float = 2.5,
         lookahead_time: float = 0.60,
+        curvature_lookahead_gain: float = 6.0,
+        curvature_q_psi_gain: float = 10.0,
+        friction_coefficient: float = 0.9,
     ):
         self.Q = np.diag(q_matrix_diag)
         self.R = np.array([[r_weight]])
@@ -88,6 +91,15 @@ class LQRController(BaseController):
         self.max_jerk = max_jerk
         self.max_lateral_accel = max_lateral_accel
         self.lookahead_time = lookahead_time
+        self.curvature_lookahead_gain = float(curvature_lookahead_gain)
+        self.curvature_q_psi_gain = float(curvature_q_psi_gain)
+        self.friction_coefficient = float(friction_coefficient)
+
+        # 车辆稳态欠转向梯度 Kv = (m / L) * (lr / Cf - lf / Cr)
+        self.understeer_gradient = float(
+            (self.mass / max(self.wheelbase, 1e-3))
+            * ((self.lr / max(self.cf, 1e-3)) - (self.lf / max(self.cr, 1e-3)))
+        )
 
         self.longitudinal_controller = LongitudinalPIDController(
             kp=0.8, ki=0.1, kd=0.0, max_accel=max_accel, max_decel=max_decel
@@ -121,23 +133,33 @@ class LQRController(BaseController):
                 hi = mid
         return points[lo] if abs(times[lo] - t_query) <= abs(times[hi] - t_query) else points[hi]
 
-    def _dare_gain(self, a_d: np.ndarray, b_d: np.ndarray) -> np.ndarray:
-        key = (round(float(np.linalg.norm(a_d)), 6), round(float(np.linalg.norm(b_d)), 6))
+    def _dare_gain(
+        self,
+        a_d: np.ndarray,
+        b_d: np.ndarray,
+        q_matrix: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        q_eff = self.Q if q_matrix is None else q_matrix
+        key = (
+            round(float(np.linalg.norm(a_d)), 6),
+            round(float(np.linalg.norm(b_d)), 6),
+            round(float(np.linalg.norm(q_eff)), 6),
+        )
         cached = self._dare_cache.get(key)
         if cached is not None:
             return cached
 
         if _scipy_linalg is not None:
             try:
-                p = _scipy_linalg.solve_discrete_are(a_d, b_d, self.Q, self.R)
+                p = _scipy_linalg.solve_discrete_are(a_d, b_d, q_eff, self.R)
             except Exception:
-                p = _solve_discrete_are_numpy(a_d, b_d, self.Q, self.R)
+                p = _solve_discrete_are_numpy(a_d, b_d, q_eff, self.R)
         else:
-            p = _solve_discrete_are_numpy(a_d, b_d, self.Q, self.R)
+            p = _solve_discrete_are_numpy(a_d, b_d, q_eff, self.R)
 
         k = np.linalg.solve(self.R + b_d.T @ p @ b_d, b_d.T @ p @ a_d)
         self._dare_cache[key] = k
-        if len(self._dare_cache) > 64:
+        if len(self._dare_cache) > 128:
             self._dare_cache.pop(next(iter(self._dare_cache)))
         return k
 
@@ -162,9 +184,14 @@ class LQRController(BaseController):
             self.longitudinal_controller.reset()
             return ControlCommand(acceleration=-2.0, brake=0.4)
 
-        # 1. 预瞄点选择：按时间索引，而不是永远取 points[0]
-        preview_t = max(0.0, min(self.lookahead_time, target_trajectory.points[-1].t))
+        # 1. 预瞄点选择：根据轨迹近端曲率自适应缩短前视时间，消除急弯转向延迟
+        initial_kappa = abs(float(target_trajectory.points[0].kappa))
+        adaptive_lookahead = self.lookahead_time / (
+            1.0 + self.curvature_lookahead_gain * initial_kappa
+        )
+        preview_t = max(0.0, min(adaptive_lookahead, target_trajectory.points[-1].t))
         target_pt = self._point_at_time(target_trajectory, preview_t)
+        abs_kappa = abs(float(target_pt.kappa))
 
         # 2. 横向/航向误差
         dx = current_state.x - target_pt.x
@@ -175,7 +202,7 @@ class LQRController(BaseController):
         epsi = current_state.heading - target_pt.theta
         epsi = float(np.arctan2(np.sin(epsi), np.cos(epsi)))
 
-        # 3. 误差动力学 (2-DOF) 与 DARE
+        # 3. 误差动力学 (2-DOF) 与自适应 DARE
         vx = max(1.0, current_state.vx)
         a = np.zeros((4, 4))
         a[0, 1] = 1.0
@@ -193,7 +220,14 @@ class LQRController(BaseController):
 
         a_d = np.eye(4) + a * dt
         b_d = b * dt
-        k = self._dare_gain(a_d, b_d)
+
+        # 状态误差加权增益调度：曲率越大，越加大航向角偏差权重 Q_psi
+        q_adaptive = self.Q.copy()
+        if self.curvature_q_psi_gain > 0.0 and abs_kappa > 1e-4:
+            q_adaptive[2, 2] = self.Q[2, 2] * (
+                1.0 + self.curvature_q_psi_gain * abs_kappa
+            )
+        k = self._dare_gain(a_d, b_d, q_adaptive)
 
         # e_y_dot 用“相对路径切向的横向速度”而不是车身 vy：
         # 运动学模型里 vy 恒为 0，若直接使用会让 LQR 丢失横向阻尼。
@@ -202,15 +236,37 @@ class LQRController(BaseController):
         error_vec = np.array([ey, ey_dot, epsi, epsi_dot], dtype=float)
         steer_fb = float(-(k @ error_vec)[0])
 
-        # 4. 曲率前馈 + 横向加速度/转向速率限制
+        # 4. 曲率前馈 (带稳态欠转向梯度补偿) + 轮胎侧向附着软保护
         prev_steer = self._prev_steer
-        steer_ff = float(target_pt.kappa * self.wheelbase)
         v_now = max(1.0, current_state.velocity)
-        # 运动学近似下，a_lat = v^2 * tan(delta) / L，据此反解舒适转向上限
-        lat_steer_limit = float(np.arctan(self.wheelbase * self.max_lateral_accel / (v_now ** 2)))
-        steer_limit = min(self.max_steer, max(lat_steer_limit, 0.005))
+        # delta_ff = kappa * (L + K_v * v^2)
+        steer_ff = float(
+            target_pt.kappa * (self.wheelbase + self.understeer_gradient * (v_now ** 2))
+        )
+
+        # 估计当前侧向加速度与地面附着裕度
+        curr_ay = float(current_state.ay if hasattr(current_state, "ay") else 0.0)
+        kinematic_ay = float(current_state.yaw_rate * v_now)
+        a_lat_est = max(abs(curr_ay), abs(kinematic_ay))
+
+        g = 9.81
+        mu_g = max(0.1, self.friction_coefficient * g)
+        adhesion_ratio = a_lat_est / mu_g
+
+        # 附着软保护：附着利用率接近极限时，平滑抑制转向速率峰值，防止轮胎饱和打滑
+        if adhesion_ratio > 0.65:
+            rate_scale = float(np.clip(1.0 - 1.8 * (adhesion_ratio - 0.65), 0.20, 1.0))
+        else:
+            rate_scale = 1.0
+
+        safe_a_lat_max = min(self.max_lateral_accel, mu_g * 0.85)
+        lat_steer_limit = float(
+            np.arctan(self.wheelbase * safe_a_lat_max / (v_now ** 2))
+        )
+        steer_limit = min(self.max_steer, max(lat_steer_limit, 0.05))
         steer_target = float(np.clip(steer_fb + steer_ff, -steer_limit, steer_limit))
-        max_delta = self.max_steer_rate * dt
+
+        max_delta = self.max_steer_rate * dt * rate_scale
         steer_cmd = float(
             np.clip(steer_target, prev_steer - max_delta, prev_steer + max_delta)
         )
