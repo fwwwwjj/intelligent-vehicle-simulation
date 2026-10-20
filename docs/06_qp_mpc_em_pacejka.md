@@ -1,8 +1,10 @@
-# 第六部分：QP / MPC / EM / Pacejka 主回路技术说明
+# 第六部分：未来工作技术储备——QP / MPC / EM / Pacejka
 
 > 版本：v0.3（2026-10-19）
 > 对应代码：`src/common/qp.py`、`src/control/mpc_controller.py`、`src/planning/em_planner.py`、`src/vehicle_model/tire.py`、`src/vehicle_model/dynamics.py`
 > 定位：把早期“显式抛错的接口骨架”补齐为**可调用、可切换、可测试、可诊断**的工程框架，同时明确没有做完整 Apollo EM / 非线性 NMPC / 轮胎试验台标定。
+
+> ⚠️ **范围声明（v0.4-core，2026-10-20）**：本文档描述的是**未来工作技术储备**，不是当前论文/答辩主结果。当前核心交付是 **FSM + Frenet Lattice + LQR + 运动学模型**（见 [07_scope_and_future_work.md](07_scope_and_future_work.md)）。本文档中的 EM/QP、LTV-MPC、Pacejka 只作为“已具备接口与原型”的扩展说明，不能写成“已完成多 seed 验证”或“优于 Lattice/LQR”。
 
 ---
 

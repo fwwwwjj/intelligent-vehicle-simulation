@@ -1,5 +1,7 @@
 # 第二部分：数字模型与系统设计
 
+> **范围说明（v0.4-core）**：当前核心交付使用 §2.1（运动学）、§2.2（Frenet）、§2.5（LQR）+ Frenet Lattice。§2.3（博弈决策）、§2.4（EM/QP）、§2.6（LTV-MPC）、§2.1 中的 Pacejka 分支属于**未来工作/技术储备**，保留数学说明与代码原型，但不纳入当前论文/答辩主结果。范围清单见 [07_scope_and_future_work.md](07_scope_and_future_work.md)。
+
 ## 1. 仿真系统总体架构
 
 本系统采用模块化分层数字孪生体系，涵盖数字环境、虚拟感知、行为决策、轨迹规划、运动控制及车辆机理动力学六大核心闭环模块。
@@ -20,14 +22,14 @@ flowchart TD
 
     subgraph Decision["行为决策层"]
         B1["分层有限状态机 (HFSM)"]
-        B2["动态博弈收益矩阵决策 (Game-Theory)"]
+        B2["动态博弈收益矩阵决策 (Game-Theory，未来工作)"]
         B3["安全防线与 TTC 判定"]
     end
 
     subgraph Plan["时空轨迹规划层"]
         P1["Frenet 坐标系双向投影映射"]
         P2["多项式候选轨迹簇采样 (Lattice)"]
-        P3["EM/QP 路径-速度优化（已实现）"]
+        P3["EM/QP 路径-速度优化（未来工作）"]
         P4["多目标综合代价评估 (Cost Evaluator)"]
     end
 
@@ -38,8 +40,8 @@ flowchart TD
     end
 
     subgraph Physics["车辆物理与数字孪生动力学"]
-        V1["二自由度非线性动力学模型"]
-        V2["线性轮胎 / Pacejka 可切换"]
+        V1["运动学模型（核心）/ 2-DOF（未来工作）"]
+        V2["线性轮胎（核心）/ Pacejka（未来工作）"]
         V3["执行机构延迟与饱和约束"]
     end
 
@@ -89,14 +91,17 @@ $$\theta = \theta_r + \arctan\left(\frac{l'}{1 - \kappa_r l}\right)$$
 ---
 
 ### 2.3 动态博弈行为决策模型 (Game-Theoretic Decision)
-针对合流与超车场景，建立主车 (Ego) 与交互背景车 (Challenger) 的二人非零和动态博弈模型。
-构建策略收益矩阵 $U = [u_{ij}]$：
-$$U_{ego} = w_{safe} J_{safe} + w_{eff} J_{eff} + w_{comf} J_{comf}$$
-通过逆向归纳法或混合策略极小极大定理，求解最优战术意图（加速汇入或减速礼让），彻底解决传统规则状态机的“死锁（Deadlock）”与过度保守问题。
+
+> **未来工作**：当前 `game_theoretic.py` 是探索性原型，在高速汇入中 20 s 内未完成汇入，不纳入主结果。以下公式描述目标设计，不代表已通过验证。
+目标设计是主车 (Ego) 与交互背景车 (Challenger) 的期望效用评估：对 3 个自车动作 × 2 个对手动作计算加权效用 $U_{ego} = w_{safe} J_{safe} + w_{eff} J_{eff} + w_{comf} J_{comf}$，再取期望效用最大的动作。
+
+当前实现**没有**求解 Nash 均衡、没有逆向归纳、也没有极小极大定理；对手礼让概率是启发式递推，不是严格贝叶斯后验。因此论文中不能写成“博弈均衡/彻底解决死锁”；这些是未来工作。
 
 ---
 
 ### 2.4 时空轨迹规划模型 (Frenet Lattice 与 EM/QP 双规划器)
+
+> **核心/未来工作边界**：Frenet Lattice 属于当前核心；EM/QP 属于未来工作，未纳入主结果。
 - **横向多项式规划**：采用五次多项式（Quintic Polynomial）生成候选横向偏移：
   $$l(t) = a_0 + a_1 t + a_2 t^2 + a_3 t^3 + a_4 t^4 + a_5 t^5$$
 - **纵向速度剖面**：以当前速度与目标速度的平均值估计终点，五次多项式同时约束起终点速度/加速度，保证 $s(t)$ 单调且停车目标不产生负速度。
@@ -120,6 +125,8 @@ $$\delta = -K e + \kappa(s) \cdot \left(L + \frac{m v_x^2}{L} \left(\frac{l_r}{c
 跟踪效果需通过当前基准脚本在指定场景、seed 和模型配置下生成并报告；不得沿用缺少可追溯原始输出的历史误差数字，也不能将合成场景结果外推为全工况保证。
 
 ### 2.6 LTV-MPC 跟踪控制模型
+
+> **未来工作**：当前 MPC 为探索性原型，`lattice+MPC` 在 `emergency_avoidance` 中仍会碰撞，不纳入主结果。
 以规划轨迹为参考，取误差状态 $e=[e_y,e_\psi,e_v]^T$、控制量 $u=[a,\delta]^T$，在每个预测步使用参考速度 $v_{ref,k}$ 与曲率 $\kappa_{ref,k}$ 线性化：
 $$
 e_{y,k+1}=e_{y,k}+\Delta t\,v_{ref,k}e_{\psi,k},\qquad
@@ -134,21 +141,24 @@ $$
 
 ## 3. 当前实现状态矩阵
 
+> 状态口径：**核心** = 进入当前论文/答辩主结果；**探索性/未来工作** = 代码保留、接口可用，但不纳入主结果。
+
 | 模型/算法 | 代码位置 | 状态 |
 | :--- | :--- | :--- |
-| 运动学自行车模型 | `src/vehicle_model/kinematics.py` | ✅ 闭环使用 |
-| 2-DOF 动力学（线性/Pacejka） | `src/vehicle_model/dynamics.py` | ✅ 可切换使用（`--dynamic` / `--tire pacejka`） |
-| Pacejka 非线性轮胎 | `tire.py` / `dynamics.py` | ✅ 稳态魔术公式 + 载荷转移 + 简化摩擦椭圆，可切换 |
-| Frenet 双向映射 | `src/common/frenet_frame.py` | ✅ 参考线插值 + 正交投影 |
-| 五次多项式 Lattice | `src/planning/frenet_lattice.py` | ✅ 横向/纵向候选 + OBB 碰撞校验 |
-| EM / QP 规划 | `src/planning/em_planner.py` | ✅ 路径 QP + S-T 速度 QP + 终端速度保护 |
-| FSM 决策 | `src/decision/rule_based_fsm.py` | ✅ 巡航/跟驰/汇入/紧急停车 |
-| 博弈决策 | `src/decision/game_theoretic.py` | ✅ 2×2 收益矩阵 + 最坏情况稳健选择 |
-| LQR 横向控制 | `src/control/lqr_controller.py` | ✅ 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
-| 纵向 PID | `src/control/pid_controller.py` | ✅ 测量值微分 + 抗积分饱和 |
-| MPC | `src/control/mpc_controller.py` | ✅ LTV 误差模型 + QP 硬/软约束 + 回退 |
-| QP 后端 | `src/common/qp.py` | ✅ 纯 NumPy ADMM + 热启动 + 残差诊断 |
-| IDM 跟驰与加速度外推 | `src/environment/obstacle_manager.py` | ✅ 背景车步进；预测使用最近一次 IDM 纵向加速度，制动至零速后停止外推 |
-| MOBIL 换道 | `obstacle_manager.py::ObstacleManager` | ✅ 场景 `traffic.enable_mobil` 可控，支持平滑三次多项式换道过渡；独立脚本化切入行为可按场景时间配置 |
-| 真实数据集加载 | `src/environment/dataset_loader.py` | ✅ highD 格式 CSV 解析 + 微型样例生成；INTERACTION/NGSIM 仍为接口 |
-| 参数标定工具链 | `src/environment/calibration.py` | ✅ 基于最小二乘优化的 IDM 跟驰参数辨识工具链 |
+| 运动学自行车模型 | `src/vehicle_model/kinematics.py` | ✅ 核心：闭环使用 |
+| Frenet 双向映射 | `src/common/frenet_frame.py` | ✅ 核心：参考线插值 + 正交投影 |
+| 五次多项式 Lattice | `src/planning/frenet_lattice.py` | ✅ 核心：横向/纵向候选 + OBB 碰撞校验 |
+| FSM 决策 | `src/decision/rule_based_fsm.py` | ✅ 核心：巡航/跟驰/汇入/紧急停车 |
+| LQR 横向控制 | `src/control/lqr_controller.py` | ✅ 核心：时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
+| 纵向 PID | `src/control/pid_controller.py` | ✅ 核心：测量值微分 + 抗积分饱和 |
+| IDM 跟驰与加速度外推 | `src/environment/obstacle_manager.py` | ✅ 核心：背景车步进与预测 |
+| MOBIL 换道 | `obstacle_manager.py::ObstacleManager` | ⚠️ 环境增强：已接入高速汇入，未做换道安全性统计 |
+| 2-DOF 动力学（线性/Pacejka） | `src/vehicle_model/dynamics.py` | 🧪 未来工作：可切换原型，未纳入主结果 |
+| Pacejka 非线性轮胎 | `tire.py` / `dynamics.py` | 🧪 未来工作：稳态魔术公式，未做试验标定 |
+| EM / QP 规划 | `src/planning/em_planner.py` | 🧪 未来工作：路径 QP + ST 速度 QP 原型，未做多 seed 统计 |
+| 博弈决策 | `src/decision/game_theoretic.py` | 🧪 未来工作：高速汇入 20 s 内未完成汇入，不可与 FSM 直接比较 |
+| MPC | `src/control/mpc_controller.py` | 🧪 未来工作：`lattice+MPC` 在紧急制动中仍会碰撞 |
+| QP 后端 | `src/common/qp.py` | 🧪 未来工作技术基础：纯 NumPy ADMM，EM/MPC 使用 |
+| 真实数据集加载 | `src/environment/dataset_loader.py` | ⚠️ highD 格式 CSV 解析 + 合成微型样例；真实标定待完成 |
+| 参数标定工具链 | `src/environment/calibration.py` | ⚠️ 工具链可用；尚未用真实 highD 完成标定 |
+| 城市无保护路口 | `scenario_loader.py` / `configs/scenarios/intersection_unprotected.yaml` | ❌ 实验性：当前会驶出道路，不纳入主结果 |

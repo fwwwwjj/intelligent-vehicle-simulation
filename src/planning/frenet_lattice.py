@@ -138,7 +138,9 @@ class FrenetLatticePlanner(BasePlanner):
             kappas[i] = dtheta / max(abs(ds), 1e-3)
 
         s_array = np.array([p.s for p in points], dtype=float)
-        if n > 2 and np.all(np.diff(s_array) >= 0):
+        # 停车/重合轨迹点上 ds 可能为 0；np.gradient 会除零并产生 NaN 警告。
+        # 这种情况下退化为 0，曲率本身仍由上面的差分给出。
+        if n > 2 and np.all(np.diff(s_array) >= 1e-6):
             dkappas = np.gradient(kappas, s_array)
         else:
             dkappas = np.zeros(n, dtype=float)

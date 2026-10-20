@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""一键运行申报材料仿真并导出图表与 KPI Markdown。"""
+"""LEGACY：旧版申报材料图表脚本（包含 Game 对比，已不属于 v0.4-core）。
+
+当前核心范围（FSM + Lattice + LQR）的图表请使用 `scripts/export_results.py` 或后续新版脚本。
+如确需运行本脚本，请显式设置环境变量 `SIAC_ALLOW_LEGACY_EXPORT=1`。
+"""
 
 from __future__ import annotations
 
 import argparse
 import logging
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -27,6 +32,9 @@ def _parse_args():
 
 def main() -> int:
     args = _parse_args()
+    if os.environ.get("SIAC_ALLOW_LEGACY_EXPORT") != "1":
+        print("LEGACY 脚本：包含 Game/旧版 KPI，不属于 v0.4-core；设置 SIAC_ALLOW_LEGACY_EXPORT=1 才可运行。")
+        return 1
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s %(levelname)s %(message)s")
     logger = logging.getLogger("competition_assets")
     project_root = Path(__file__).resolve().parents[1]

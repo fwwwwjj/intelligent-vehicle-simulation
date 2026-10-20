@@ -52,6 +52,7 @@ class SimulationEngine:
         plan_dt: float = 0.1,
         plan_horizon: float = 5.0,
         tire_model: Optional[str] = None,
+        scenario_name: Optional[str] = None,
     ):
         self.road_network = road_network
         self.obstacle_manager = obstacle_manager
@@ -59,6 +60,7 @@ class SimulationEngine:
         self.planner = planner
         self.controller = controller
         self.ego_state = ego_initial_state
+        self.scenario_name = str(scenario_name or "").lower()
         self.tire_model = str(
             tire_model
             or (vehicle_params or {}).get("tire_model", "linear")
@@ -132,6 +134,11 @@ class SimulationEngine:
         self._prev_y = float(ego_initial_state.y)
         self._distance_traveled = 0.0
         self._step_index = 0
+
+        # 任务级判定状态：success 不再只看碰撞，而是由场景目标 + 车道偏离共同决定。
+        self.task_completed = False
+        self.task_completion_time: Optional[float] = None
+        self.road_departure = False
 
     # ------------------------------------------------------------------
     # 指标计算
@@ -253,6 +260,127 @@ class SimulationEngine:
         return False
 
     # ------------------------------------------------------------------
+    # 任务级判定
+    # ------------------------------------------------------------------
+    def _update_road_departure(self) -> None:
+        """车辆离开“最近车道”中心线超过半车道宽 + 0.5 m 时记为驶出道路。
+
+        换道过程中 current_lane_id 可能仍停留在旧车道，因此这里取全部车道中
+        的最近距离，避免把正常换道误判为驶出道路。
+        """
+        if not self.road_network.lanes:
+            return
+        nearest_id = min(
+            self.road_network.lanes,
+            key=lambda lane_id: self.road_network.distance_to_lane(
+                lane_id, self.ego_state.x, self.ego_state.y
+            ),
+        )
+        lane = self.road_network.get_lane(nearest_id)
+        if lane is None:
+            return
+        distance = self.road_network.distance_to_lane(
+            nearest_id, self.ego_state.x, self.ego_state.y
+        )
+        if distance > 0.5 * lane.width + 0.5:
+            self.road_departure = True
+
+    def _update_task_completion(self) -> None:
+        """按场景目标更新“任务是否完成”，用于任务级 success。"""
+        name = self.scenario_name
+        if name == "highway_merge":
+            if not self.task_completed and self.current_lane_id.startswith("main_lane"):
+                self.task_completed = True
+                self.task_completion_time = float(self.current_time)
+        elif name == "intersection_unprotected":
+            # 左转完成后应位于北向出口（main_lane_0），而不是直行进入 cross_straight。
+            if (
+                not self.task_completed
+                and self.current_lane_id == "main_lane_0"
+                and self.ego_state.y > 100.0
+            ):
+                self.task_completed = True
+                self.task_completion_time = float(self.current_time)
+
+    def _imminent_collision(
+        self,
+        trajectory: Optional[Trajectory],
+        obstacles: list[ObstacleState],
+        horizon: float = 1.0,
+    ) -> bool:
+        """检查规划轨迹前 horizon 秒内是否存在 OBB 碰撞。
+
+        invalid 轨迹可能只是“远端有碰撞/加速度越界”，并不代表当前必须急刹；
+        只有 imminent 碰撞才触发最小风险制动，避免把正常跟驰误判成急停。
+        """
+        if trajectory is None or not trajectory.points:
+            return True
+        if not obstacles:
+            return False
+        for point in trajectory.points:
+            if point.t > horizon:
+                break
+            ego_box = BoundingBox2D(
+                point.x,
+                point.y,
+                self.vehicle_length,
+                self.vehicle_width,
+                point.theta,
+            )
+            for obs in obstacles:
+                obs_box = BoundingBox2D(
+                    obs.x + obs.vx * point.t,
+                    obs.y + obs.vy * point.t,
+                    obs.length,
+                    obs.width,
+                    obs.heading,
+                )
+                if CollisionChecker.check_obb_collision(ego_box, obs_box, buffer=0.0):
+                    return True
+        return False
+
+    def _refresh_task_result(self) -> None:
+        """把场景目标、碰撞、车道偏离合成为任务级 success。"""
+        records = self.evaluator.records
+        no_collision = not any(record.is_collision for record in records)
+        min_gap = min((record.min_obstacle_distance for record in records), default=999.0)
+        name = self.scenario_name
+
+        if name == "highway_merge":
+            completed = bool(self.task_completed)
+            success = completed and no_collision and not self.road_departure
+        elif name == "cut_in":
+            # 观察窗口至少覆盖 cut-in 触发后 5 s，避免“提前结束也算成功”。
+            completed = (
+                no_collision
+                and min_gap >= 2.0
+                and not self.road_departure
+                and self.current_time >= 5.0
+            )
+            success = completed
+        elif name == "emergency_avoidance":
+            completed = (
+                no_collision
+                and self.ego_state.velocity <= 0.5
+                and min_gap >= 2.0
+                and not self.road_departure
+            )
+            success = completed
+        elif name == "intersection_unprotected":
+            completed = bool(self.task_completed)
+            success = completed and no_collision and not self.road_departure
+        else:
+            completed = no_collision
+            success = no_collision
+
+        self.evaluator.set_task_result(
+            success=success,
+            completed=completed,
+            completion_time=self.task_completion_time,
+            road_departure=self.road_departure,
+        )
+
+    # ------------------------------------------------------------------
     # 单步闭环
     # ------------------------------------------------------------------
     def step(self) -> SimulationMetricsRecord:
@@ -291,10 +419,29 @@ class SimulationEngine:
         planning_latency_ms = (time.perf_counter() - t_plan) * 1000.0
 
         # 5. 底层运动跟踪控制
-        t_control = time.perf_counter()
-        control_cmd = self.controller.compute_control(
-            self.ego_state, planned_trajectory, self.dt
+        # 安全监督：规划器返回空轨迹或 invalid 轨迹时，不再跟踪它，直接进入
+        # 最小风险制动，避免“规划器已经判定碰撞、控制器还在追轨迹”。
+        planner_invalid = (
+            planned_trajectory is None
+            or not planned_trajectory.points
+            or not planned_trajectory.valid
         )
+        safety_brake = planner_invalid and self._imminent_collision(
+            planned_trajectory, ground_truth_obstacles, horizon=1.0
+        )
+        t_control = time.perf_counter()
+        if safety_brake:
+            control_cmd = ControlCommand(
+                steering_angle=0.0,
+                acceleration=-self.max_decel,
+                throttle=0.0,
+                brake=1.0,
+                steering_rate=0.0,
+            )
+        else:
+            control_cmd = self.controller.compute_control(
+                self.ego_state, planned_trajectory, self.dt
+            )
         control_latency_ms = (time.perf_counter() - t_control) * 1000.0
 
         # 6. 车辆机理模型前向积分
@@ -313,6 +460,8 @@ class SimulationEngine:
         )
         if lane_id is not None:
             self.current_lane_id = lane_id
+        self._update_road_departure()
+        self._update_task_completion()
 
         # 8. 真实 KPI 计算与回退诊断
         lateral_error, heading_error = self._tracking_errors(planned_trajectory, reference_line)
@@ -346,9 +495,12 @@ class SimulationEngine:
             distance_traveled=float(self._distance_traveled),
             collision_count=int(collision_count),
             planner_fallback=planner_fallback,
+            planner_invalid=planner_invalid,
+            safety_brake=safety_brake,
             controller_fallback=controller_fallback,
         )
         self.evaluator.record_step(record)
+        self._refresh_task_result()
 
         # 9. 实时画面渲染
         if self.enable_visualization and self.visualizer is not None:

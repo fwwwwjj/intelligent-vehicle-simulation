@@ -238,6 +238,38 @@ class TestClosedLoop(unittest.TestCase):
         scenario = load_named_scenario("highway_merge")
         self.assertTrue(scenario.obstacle_manager.enable_mobil)
 
+    def test_builtin_and_yaml_scenarios_are_consistent(self):
+        """YAML 与内置 dict 是同一场景的两个入口，关键字段必须一致。"""
+        cases = (
+            ("highway_merge", build_highway_merge_scenario),
+            ("cut_in", build_cut_in_scenario),
+            ("emergency_avoidance", build_emergency_avoidance_scenario),
+            ("intersection_unprotected", build_intersection_unprotected_scenario),
+        )
+        for name, builder in cases:
+            builtin = builder()
+            loaded = load_named_scenario(name)
+            self.assertEqual(builtin.ego_state.x, loaded.ego_state.x, name)
+            self.assertEqual(builtin.ego_state.y, loaded.ego_state.y, name)
+            self.assertEqual(builtin.ego_state.velocity, loaded.ego_state.velocity, name)
+            self.assertEqual(builtin.current_lane_id, loaded.current_lane_id, name)
+            self.assertEqual(set(builtin.road_network.lanes), set(loaded.road_network.lanes), name)
+            self.assertEqual(
+                builtin.obstacle_manager.enable_mobil,
+                loaded.obstacle_manager.enable_mobil,
+                name,
+            )
+            self.assertEqual(
+                set(builtin.obstacle_manager.obstacles),
+                set(loaded.obstacle_manager.obstacles),
+                name,
+            )
+            for obs_id, obs in builtin.obstacle_manager.obstacles.items():
+                other = loaded.obstacle_manager.obstacles[obs_id]
+                self.assertAlmostEqual(obs.x, other.x, places=6, msg=f"{name}/{obs_id}")
+                self.assertAlmostEqual(obs.y, other.y, places=6, msg=f"{name}/{obs_id}")
+                self.assertAlmostEqual(obs.vx, other.vx, places=6, msg=f"{name}/{obs_id}")
+
 
 if __name__ == "__main__":
     unittest.main()

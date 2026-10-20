@@ -155,6 +155,19 @@ class BenchmarkSuite:
         except (OSError, subprocess.CalledProcessError):
             commit = None
 
+        try:
+            dirty = bool(
+                subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    cwd=Path(__file__).resolve().parents[2],
+                ).stdout.strip()
+            )
+        except (OSError, subprocess.CalledProcessError):
+            dirty = None
+
         scenario_fingerprints = {}
         repo_root = Path(__file__).resolve().parents[2]
         for scenario in self.scenario_configs:
@@ -163,7 +176,11 @@ class BenchmarkSuite:
                 candidate = repo_root / "configs" / "scenarios" / f"{scenario}.yaml"
             if candidate.is_file():
                 scenario_fingerprints[str(scenario)] = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        return {"git_commit": commit, "scenario_sha256": scenario_fingerprints}
+        return {
+            "git_commit": commit,
+            "git_dirty": dirty,
+            "scenario_sha256": scenario_fingerprints,
+        }
 
     def to_rows(self) -> List[Dict[str, Any]]:
         """把结果展平为适合 CSV 的行。"""
@@ -188,7 +205,7 @@ class BenchmarkSuite:
                     "use_dynamic_model": self.use_dynamic_model,
                     "python_version": platform.python_version(),
                     **self._provenance_metadata(),
-                    "success_rate_definition": "mean of per-run binary success_rate; Wilson 95% interval",
+                    "success_rate_definition": "per-run task-level binary success (task completion + no collision + no road departure); mean with Wilson 95% interval",
                     "metric_std_definition": "sample standard deviation (ddof=1); 0 for a single run",
                 },
                 "runs": self.results,
@@ -197,12 +214,12 @@ class BenchmarkSuite:
         rows = self.to_rows()
         if rows:
             with csv_path.open("w", encoding="utf-8", newline="") as fh:
-                writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+                writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()), lineterminator="\n")
                 writer.writeheader()
                 writer.writerows(rows)
         if self.group_summary:
             with summary_csv_path.open("w", encoding="utf-8", newline="") as fh:
-                writer = csv.DictWriter(fh, fieldnames=list(self.group_summary[0].keys()))
+                writer = csv.DictWriter(fh, fieldnames=list(self.group_summary[0].keys()), lineterminator="\n")
                 writer.writeheader()
                 writer.writerows(self.group_summary)
         return json_path, csv_path, summary_csv_path

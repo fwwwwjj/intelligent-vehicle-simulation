@@ -188,6 +188,13 @@ class RoadNetwork:
             return nearest_id
         return None
 
+    def distance_to_lane(self, lane_id: str, x: float, y: float) -> float:
+        """车辆到指定车道中心折线的最短距离 (m)，用于车道偏离/驶出道路判定。"""
+        lane = self.lanes.get(lane_id)
+        if lane is None or not lane.center_points:
+            return float("inf")
+        return self._point_to_polyline_distance(x, y, lane.center_points)
+
     def get_lane_center_y(self, lane_id: str) -> Optional[float]:
         """
         返回车道中心线的名义 y 坐标（直线道路场景）。

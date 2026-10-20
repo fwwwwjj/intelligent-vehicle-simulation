@@ -176,6 +176,7 @@ def build_engine(
         sensor_params=scenario.sensor_params,
         initial_lane_id=scenario.current_lane_id,
         tire_model=resolved_tire,
+        scenario_name=scenario.name,
     )
 
 

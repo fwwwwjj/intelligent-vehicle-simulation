@@ -1,46 +1,44 @@
 # 第五部分：代码体系与参考文献
 
+> **范围说明（v0.4-core）**：当前核心代码链路为 HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI；Game/EM/MPC/Pacejka/交叉口为未来工作，代码保留但不纳入主结果。详见 [07_scope_and_future_work.md](07_scope_and_future_work.md)。
+
 ## 1. 代码系统架构索引
 
 ```
 intelligent-vehicle-simulation/
-├── README.md                   # 项目综合介绍、竞赛架构图与快速上手指南
+├── README.md                   # 项目总览：核心链路 + 未来工作
 ├── requirements.txt            # 系统核心 Python 科学计算依赖清单
+├── LICENSE                     # MIT
 ├── .gitignore                  # Git 忽略配置
 ├── configs/                    # 场景拓扑与算法超参数 YAML 配置文件
 │   ├── default_config.yaml     # 仿真步长、车辆几何、动力学物理参数
-│   └── scenarios/              # 高速汇入、城市交叉口、紧急避障场景配置
-├── docs/                       # 中国仿真创新应用大赛官方申报材料规范文档
-│   ├── 01_problem_and_data.md  # 问题来源与真实数据集 (highD/INTERACTION) 说明
-│   ├── 02_digital_models.md    # 动力学、Frenet映射、博弈决策与优化数学模型
-│   ├── 03_results_and_demo.md  # 典型工况量化评估指标 (KPI) 与对比分析
-│   ├── 04_application.md       # 工业级软件在环 (SIL) 与虚拟实验教学应用说明
-│   └── 05_references.md        # 权威学术参考文献与国际行业标准规范
-├── src/                        # 核心仿真引擎与高保真算法接口实现
-│   ├── common/                 # 车辆状态、Frenet双向映射、OBB几何碰撞检测
-│   ├── environment/            # 道路网络、场景加载、IDM/MOBIL 交通演化、highD CSV 解析；INTERACTION 预留
+│   └── scenarios/              # 三个核心场景 + 实验性交叉口
+├── docs/                       # 大赛技术支撑材料
+│   ├── 01_problem_and_data.md  # 问题来源与数据来源说明
+│   ├── 02_digital_models.md    # 数字模型（核心/未来工作标注）
+│   ├── 03_results_and_demo.md  # 核心 10-seed 结果与分析
+│   ├── 04_application.md       # 应用与工程落地
+│   ├── 05_references.md        # 代码体系与参考文献
+│   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
+│   ├── 07_scope_and_future_work.md  # 范围与未来工作清单
+│   └── 08_paper_draft.md        # 论文草稿（v0.4-core）
+├── src/                        # 核心仿真引擎与算法接口
+│   ├── common/                 # 车辆状态、Frenet 映射、OBB 碰撞、QP 后端
+│   ├── environment/            # 道路网络、场景加载、IDM/MOBIL、highD 解析
 │   │   ├── road_network.py     # 车道拓扑与真实 s/theta/kappa 参考线
 │   │   ├── scenario_loader.py  # YAML/JSON 场景 -> 路网/障碍物/自车
 │   │   ├── obstacle_manager.py # IDM 步进与预测轨迹
-│   │   └── dataset_loader.py   # highD 格式 CSV 解析；INTERACTION/NGSIM 为接口（未附带数据）
-│   ├── vehicle_model/          # 运动学、2-DOF 线性/Pacejka 轮胎、传感器模型
-│   ├── decision/               # 分层有限状态机 (HFSM) 与收益矩阵博弈决策
-│   ├── planning/               # Frenet Lattice / EM-QP + OBB 碰撞校验
-│   ├── control/                # LQR / LTV-MPC + 曲率前馈 + 纵向 PID
-│   ├── evaluation/             # 真实 KPI 计算器与批量回归基准评测套件
-│   ├── visualization/          # 2D BEV 实时动画与真实遥测图表
+│   │   └── dataset_loader.py   # highD 格式 CSV 解析；INTERACTION/NGSIM 为接口
+│   ├── vehicle_model/          # 运动学（核心）、2-DOF/Pacejka（未来工作）、传感器
+│   ├── decision/               # HFSM（核心）、Game（探索性）
+│   ├── planning/               # Frenet Lattice（核心）、EM/QP（探索性）
+│   ├── control/                # LQR/PID（核心）、MPC（探索性）
+│   ├── evaluation/             # 任务级 KPI 与批量 benchmark
+│   ├── visualization/          # 2D BEV 与真实遥测图表
 │   ├── runner.py               # 场景 -> 决策/规划/控制/引擎装配工厂
-│   └── simulator.py            # 端到端闭环仿真主引擎 (SimulationEngine)
-├── scripts/                    # 自动化运行脚本与演示入口
-│   ├── run_simulation.py       # 单场景交互式可视化仿真运行入口
-│   ├── run_benchmark.py        # 批量基准压力测试与评分脚本
-│   └── export_results.py       # 竞赛申报书科研分析图表导出脚本
-└── tests/                      # 单元测试与闭环回归测试套件
-    ├── test_coordinates.py     # 坐标变换与 OBB/SAT
-    ├── test_vehicle_model.py   # 运动学与动力学积分步进
-    ├── test_planners.py        # 五次多项式边界条件
-    ├── test_controllers.py     # LQR 与 PID 控制器
-    └── test_closed_loop.py     # 真实参考线、碰撞指标、速度跟踪与 seed 复现
+│   └── simulator.py            # 端到端闭环仿真主引擎
+├── scripts/                    # run_simulation / run_benchmark / export_results / export_core_figures
+└── tests/                      # 86 项单元/闭环测试（含任务成功判据）
 ```
 
 ---
@@ -48,15 +46,18 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 测试数量以本地运行输出为准
-python3 -m unittest discover tests -v
+# 低功耗测试（当前 86 项；含任务级闭环用例；约 10–20 s，视机器负载）
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
+  nice -n 19 python3 -B -m unittest discover tests -v
 
-# 闭环仿真 + KPI
+# 核心场景闭环 + KPI
 python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
 
-# 批量评测（逐次结果写入 JSON/CSV，分组统计另写 benchmark_summary.csv）
-python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance \
-  --decisions fsm game --seeds 42 --duration 20
+# 核心基准（10 seeds；论文目标 30–50 seeds）
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
+  nice -n 19 python3 -B scripts/run_benchmark.py \
+  --scenarios highway_merge cut_in emergency_avoidance \
+  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 --duration 20
 ```
 
 ---

@@ -1,7 +1,7 @@
 # 智能车辆仿真系统：全栈架构规范、变量量纲口径与 AI 协作开发指南
 ### Intelligent Vehicle Simulation System: Architecture, Conventions, and AI Collaboration Specification
 
-> **版本**：v0.3（2026-10-19）。本版在 v0.2 闭环基线上补齐 **EM/QP 规划器、LTV-MPC 控制器、Pacejka 轮胎主回路** 与**纯 NumPy QP 后端**，并把“未实现接口必须显式失败”的规则收窄到 INTERACTION/NGSIM、全量生产标定、OpenSCENARIO 等仍未完成项。v0.2 的 P0 基线为 commit `e701687`。
+> **版本**：v0.4-core（2026-10-20）。本版把范围收敛到 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**；Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真统一列为未来工作。v0.3 中的 QP/MPC/EM/Pacejka 实现仍保留为技术储备，但不纳入当前主结果。范围清单见 `docs/07_scope_and_future_work.md`。
 
 > **说明文档定位**：本规范文件为本项目（中国仿真创新应用大赛参赛作品）的**单一真实数据源（Single Source of Truth, SSOT）**。旨在统一整个系统内部的所有数学物理坐标系、状态变量命名口径、量纲单位及模块间交互契约。
 > 
@@ -15,7 +15,7 @@
 - [三、 核心模块数据流与调用拓扑 (Dataflow & Topology)](#三-核心模块数据流与调用拓扑-dataflow--topology)
 - [四、 模块职责边界与修改扩展契约 (Invariants & Extension Contracts)](#四-模块职责边界与修改扩展契约-invariants--extension-contracts)
 - [五、 后续 AI 工具修改代码操作守则 (AI Prompt & Development Rules)](#五-后续-ai-工具修改代码操作守则-ai-prompt--development-rules)
-- [六、 当前实现边界与验收口径（v0.2）](#六-当前实现边界与验收口径v02)
+- [六、 当前实现边界与验收口径（v0.4-core）](#六-当前实现边界与验收口径v04-core)
 
 ---
 
@@ -260,64 +260,76 @@ sequenceDiagram
 3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
 4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过；当前测试数量以实际运行输出为准。低功耗环境下建议限制 BLAS 线程并使用 `nice`。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
-6. 【未实现接口必须显式失败】：INTERACTION/NGSIM 数据接入、OpenSCENARIO/ROS/CARLA 联合仿真等尚未实现的入口必须抛出 NotImplementedError 或返回明确的“不支持”状态，禁止返回空 Trajectory / 零控制量冒充有效输出。EM/QP 与 MPC 已实现，失败时必须返回可诊断的回退结果（`last_path_result` / `last_speed_result` / `last_solve_info`），不得静默伪装成功。
+6. 【未实现接口必须显式失败】：INTERACTION/NGSIM 数据接入、OpenSCENARIO/ROS/CARLA 联合仿真等尚未实现的入口必须抛出 NotImplementedError 或返回明确的“不支持”状态，禁止返回空 Trajectory / 零控制量冒充有效输出。EM/QP 与 MPC 已有原型（属于未来工作），失败时必须返回可诊断的回退结果（`last_path_result` / `last_speed_result` / `last_solve_info`），不得静默伪装成功。
 7. 【结果由脚本生成】：KPI 表、曲线与对比数字必须由 scripts/ 下的运行/评测脚本生成；单 seed 结果必须标注，禁止手填或复制旧文档数字。
 ```
 
 
 ---
 
-## 六、 当前实现边界与验收口径（v0.3）
+## 六、 当前实现边界与验收口径（v0.4-core）
 
 > 本节用于防止“接口预留”被写成“已完成”。修改代码或文档前，先对照下表。
+>
+> **v0.4-core 范围**：核心交付只包含 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**。Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真属于未来工作，代码保留但不纳入主结果；详见 `docs/07_scope_and_future_work.md`。
 
-### 1. 已进入闭环的模块
+### 1. 已进入核心闭环的模块
 
 | 模块 | 入口 | 验收方式 |
 | :--- | :--- | :--- |
-| 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；内置 `highway_merge`、`emergency_avoidance`、`cut_in` |
-| 道路参考线 | `src/environment/road_network.py` | 生成真实 `s/theta/kappa`，按位置查车道 |
+| 场景加载 | `src/environment/scenario_loader.py` | YAML/JSON -> `Scenario`；核心 `highway_merge`、`cut_in`、`emergency_avoidance` |
+| 道路参考线 | `src/environment/road_network.py` | 生成真实 `s/theta/kappa`，按位置查车道、算车道偏离 |
 | Frenet 映射 | `src/common/frenet_frame.py` | 正交投影 + `ref_point_at_s` 插值；`l_prime_prime` 暂置 0，规划器数值重算曲率 |
 | 轨迹规划 | `src/planning/frenet_lattice.py` | 五次多项式 + 时间投影 OBB 碰撞校验 + 曲率/jerk 填充 |
-| 行为决策 | `src/decision/rule_based_fsm.py` / `game_theoretic.py` | 跟驰、汇入、紧急停车；2×2 收益矩阵 |
-| 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
-| LTV-MPC | `src/control/mpc_controller.py` | 误差动力学 + QP 硬/软约束 + 回退诊断 |
+| 行为决策 | `src/decision/rule_based_fsm.py` | 跟驰、汇入、紧急停车 |
+| 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制（去掉 0.05 rad 下限） |
 | 纵向控制 | `src/control/pid_controller.py` | 测量值微分 + 抗积分饱和 |
-| EM/QP 规划 | `src/planning/em_planner.py` | 路径 QP + ST 速度 QP + 终端速度保护 |
-| QP 后端 | `src/common/qp.py` | 纯 NumPy ADMM + 热启动 + 残差诊断 |
-| 车辆模型 | `src/vehicle_model/kinematics.py` / `dynamics.py` | 运动学 / 2-DOF 线性或 Pacejka 轮胎 |
-| Pacejka 轮胎 | `src/vehicle_model/tire.py` | 稳态魔术公式 + 载荷转移 + 简化摩擦椭圆 |
-| 交通演化与换道 | `src/environment/obstacle_manager.py` | IDM 跟驰 + 加速度外推；MOBIL 换道状态机（支持平滑三次多项式过渡） |
-| 数据集解析与演示 | `src/environment/dataset_loader.py` | highD 格式 CSV 解析；微型演示切片 `scripts/generate_sample_highd.py` |
-| 参数标定工具链 | `src/environment/calibration.py` | 基于非线性优化的 IDM 跟驰参数系统辨识 |
-| KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、OBB 净距、TTC、横向/航向误差、Δa/Δt jerk、时延拆分 |
-| 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 多决策 × 多场景 × planner/controller/tire；JSON 保留配置、逐次结果和分组汇总，CSV 分别输出原始运行与分组统计 |
+| 车辆模型 | `src/vehicle_model/kinematics.py` | 运动学自行车模型 |
+| 交通演化 | `src/environment/obstacle_manager.py` | IDM 跟驰 + 加速度外推；MOBIL 为环境增强 |
+| 数据集解析与演示 | `src/environment/dataset_loader.py` | highD 格式 CSV 解析；微型演示切片 |
+| 参数标定工具链 | `src/environment/calibration.py` | IDM 跟驰参数辨识工具链（尚未用真实 highD 标定） |
+| 安全监督 | `src/simulator.py` | 记录 invalid 轨迹；1 s 内即将碰撞时进入最小风险制动，记录 `planner_invalid` / `safety_brake` |
+| 任务级 KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、净距、TTC、横向/航向误差、Jerk、时延、任务成功/完成时间/驶出道路/规划无效帧 |
+| 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 场景 × 算法；JSON 配置/逐次结果/分组汇总；CSV 明细与统计 |
 
-### 2. 仅接口预留 / 未实现
+### 2. 探索性 / 未来工作模块（不纳入主结果）
 
-| 功能 | 现状 | 禁止表述 |
+| 模块 | 现状 | 禁止表述 |
 | :--- | :--- | :--- |
-| INTERACTION / NGSIM | 接口骨架，返回元数据/空列表 | “已接入 INTERACTION/NGSIM” |
-| 全量实测数据生产标定 | 具备标定工具链与微型演示切片；仓库未附带数十 GB 全量数据 | “已用全量实车数据完成生产标定” |
+| 博弈决策 `game_theoretic.py` | 收益评估/信念更新原型；高速汇入 20 s 内未完成汇入 | “Game 优于 FSM”“已完成博弈验证” |
+| EM/QP `em_planner.py` | 路径 QP + 速度 QP 原型；未做多 seed 统计 | “EM/QP 已完成大规模验证” |
+| LTV-MPC `mpc_controller.py` | 线性化误差模型 + QP；紧急制动会碰撞 | “MPC 可替代 LQR/已通过安全验证” |
+| Pacejka `tire.py` | 稳态魔术公式原型；未做试验标定 | “已完成轮胎试验标定” |
+| 城市无保护路口 | 拓扑存在；当前会驶出道路 | “无保护左转已实现” |
+| highD / INTERACTION / NGSIM | highD 仅有解析器 + 合成样例；其余接口骨架 | “已接入真实数据/已完成标定” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
-| 大规模多 seed 统计 | 当前仅单 seed/短时冒烟 | “统计显著优于基线” |
+| 大规模多 seed 统计 | 当前核心 10 seeds，属轻量基准 | “统计显著优于基线” |
 
 ### 3. 指标口径
 
+- **任务成功 `success_rate`**：由场景目标 + 无碰撞 + 不驶出道路共同判定，不再等于“未碰撞”。核心判据：
+  - `highway_merge`：20 s 内进入 `main_lane_*`；
+  - `cut_in`：无碰撞、最小净距 ≥ 2 m、不驶出道路、观察窗口 ≥ 5 s；
+  - `emergency_avoidance`：无碰撞、最终速度 ≤ 0.5 m/s、最小净距 ≥ 2 m、不驶出道路。
+- **任务完成时间**：首次满足场景目标的时刻；非离散任务记 999，不解释为“999 s 完成”。
+- **驶出道路**：到最近车道中心线距离 > 半车道宽 + 0.5 m；换道过程中按最近车道判定，避免误报。
 - **碰撞**：OBB + SAT，`buffer=0`；任一步相交即 `is_collision=True`。
 - **最小净距**：矩形边界最短距离，不是中心点距离。
 - **TTC**：仅前方、横向重叠目标，`gap / closing_speed`；无接近目标记 999。
 - **Jerk**：实际加速度差分 `Δa/Δt`，不是轨迹理论值。
 - **横向误差**：自车到规划轨迹最近点的 cross-track 误差。
 - **时延**：决策、规划、控制分别计时，禁止合并成一个 `planning_latency_ms`。
-- **QP 诊断与回退**：MPC 用 `last_solve_info`（status/success/iterations/residual/violation），EM 用 `last_path_result` / `last_speed_result`（success/iterations/constraint_violation/note）记录求解质量；`planner_fallback` 由 EM 路径/速度 QP 成功标志判定（任一失败或空轨迹置 True；Lattice 恒为 False）；`controller_fallback` 由 MPC QP 成功标志判定（失败或空轨迹置 True；LQR 恒为 False）；汇总报告回退次数与比率。
-- **P95 时延**：`p95_planning_latency_ms` 与 `p95_control_latency_ms` 仅在有效仿真帧数 $\ge 20$ 时输出，避免微型测试产生失真分位数。
-- **碰撞计数**：`collision_count` 为逐帧碰撞障碍物数量之和；`collision_frames` 为发生碰撞的帧数；单次 `success_rate` 是 0/1 结果。批量汇总中的 `success_rate_mean` 是逐次二值结果的均值，并给出 Wilson 95% 区间；其他数值指标报告均值与样本标准差（单样本标准差记 0）。
+- **QP 诊断与回退**：MPC 用 `last_solve_info`，EM 用 `last_path_result` / `last_speed_result`；这些模块属于未来工作，不应据此写主结论。
+- **规划无效帧 `planner_invalid`**：规划器返回空轨迹或 `Trajectory.valid=False` 时置 True；累计 `planner_invalid_count/rate`。
+- **安全制动 `safety_brake`**：仅当 invalid 轨迹在前 1 s 内存在 OBB 碰撞（或轨迹为空）时触发最大减速度/零转向，累计 `safety_brake_count/rate`；避免把“远端碰撞/加速度越界”误判成急刹。
+- **P95 时延**：`p95_planning_latency_ms` 与 `p95_control_latency_ms` 仅在有效仿真帧数 $\ge 20$ 时输出。
+- **碰撞计数**：`collision_count` 为逐帧碰撞障碍物数量之和；`collision_frames` 为发生碰撞的帧数；批量汇总中的 `success_rate_mean` 是逐次二值结果的均值，并给出 Wilson 95% 区间。
 - **长度口径**：`TrajectoryPoint.s` 是参考线站距，不是实际路径弧长；大横向偏移时两者有差异。
 
 ### 4. 结果可信度
 
 - 结果表必须由 `scripts/run_benchmark.py` 或 `scripts/run_simulation.py --save_results` 生成；批量基准写出 `benchmark.json`、原始运行 `benchmark.csv` 和分组 `benchmark_summary.csv`；
-- 至少报告 seed、场景、时长、样本数；单 seed 结果不得写成统计结论；
-- 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用。
-- EM/QP、MPC、Pacejka 的短时冒烟结果不得写成“统计显著优于 LQR/Lattice”；单 seed 表只描述该次运行。
+- 至少报告 seed、场景、时长、样本数；单 seed/10-seed 结果不得写成统计结论；
+- 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用；
+- 当前核心结果：3 场景 × FSM × 10 seeds；论文目标 30–50 seeds；
+- Game/EM/MPC/Pacejka/交叉口的短时冒烟或探索性结果不得写成“统计显著优于 LQR/Lattice/FSM”。

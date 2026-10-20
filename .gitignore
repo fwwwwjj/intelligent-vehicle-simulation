@@ -39,6 +39,9 @@ results/*
 !results/benchmark.json
 !results/benchmark.csv
 !results/benchmark_summary.csv
+!results/competition_pack/
+!results/competition_pack/README.md
+!results/competition_pack/kpi_table.md
 data/raw/
 *.csv
 !results/*.csv

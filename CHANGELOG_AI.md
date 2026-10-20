@@ -1,6 +1,26 @@
 # AI 修改记录
 
-## 2026-10-20 (完善 FSM 与 Game 决策差异度、基准元数据追溯与工程治理)
+## 2026-10-20 (v0.4-core：范围收敛到 FSM + Lattice + LQR，复杂算法转为未来工作)
+
+- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`src/evaluation/benchmark.py`、`src/environment/road_network.py`、`src/environment/scenario_loader.py`、`src/planning/frenet_lattice.py`、`src/runner.py`、`src/control/lqr_controller.py`、`src/control/mpc_controller.py`、`scripts/run_benchmark.py`、`scripts/export_core_figures.py`（新增）、`scripts/export_competition_assets.py`、`tests/test_task_success.py`（新增）、`tests/test_closed_loop.py`、`.github/workflows/ci.yml`（恢复）、`LICENSE`（新增）、`README.md`、`docs/02`、`docs/03`、`docs/04`、`docs/05`、`docs/06`、`docs/07`（新增）、`docs/08_paper_draft.md`（新增）、`AI_SYSTEM_SPEC.md`、`results/*`、`CHANGELOG_AI.md`。
+- **修改内容**：
+  1. **范围收敛**：当前核心交付定为 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**（highway_merge / cut_in / emergency_avoidance）。Game、EM/QP、LTV-MPC、Pacejka、城市无保护路口、MOBIL 统计、highD 真实标定、OpenSCENARIO/ROS/CARLA 统一列为未来工作；代码与接口保留，但不纳入主结果。
+  2. **任务级 success**：`success_rate` 不再只判断碰撞，而是由场景目标 + 无碰撞 + 不驶出道路共同决定；新增 `task_success`、`task_completed`、`task_completion_time_s`、`road_departure` 字段。这样 Game 未汇入、交叉口驶出道路都会自动判 0，避免“没做事也算成功”。
+  3. **横向约束修复**：去掉 LQR/MPC 中 `max(lat_steer_limit, 0.05)` 的转角下限，改为 1e-3 数值保护；22 m/s 下横向加速度不再被抬到约 9 m/s²，而是限制在 2.5 m/s² 附近。
+  4. **安全监督**：规划轨迹 invalid 时不再一律急刹；只有轨迹为空或前 1 s 内存在 OBB 碰撞时才进入最小风险制动，记录 `planner_invalid` / `safety_brake`。避免把“远端碰撞/加速度越界”误判成急刹。
+  5. **基准重跑**：3 场景 × FSM × 10 seeds（42–51），20 s 闭环；`results/benchmark.json/csv/summary.csv` 已由当前工作区重新生成。10 seeds 为轻量基准，论文目标 30–50 seeds。
+  6. **测试**：新增 `tests/test_task_success.py`（任务成功、未汇入判失败、交叉口未完成判失败、cut-in/紧急制动成功、LQR 横向加速度上限、invalid 轨迹安全兜底）与 YAML/内置场景一致性测试；全量 **86 项测试通过**（约 10–20 s，单线程 BLAS + nice）。
+  7. **文档与交付**：README/docs/03/docs/04 删除“Game 50.4% 提升”“交叉口已实现”“MPC 已可替代 LQR”等表述；新增 `docs/07_scope_and_future_work.md` 与 `docs/08_paper_draft.md`；docs/06 标注为未来工作技术储备；恢复 `.github/workflows/ci.yml`；新增 `LICENSE`；新增 `scripts/export_core_figures.py` 并生成 5 张核心图。
+- **验证方式及结果**：
+  - `OMP_NUM_THREADS=1 ... nice -n 19 python3 -B -m unittest discover tests` → 86 项通过（约 10–20 s）；
+  - `run_benchmark.py --scenarios highway_merge cut_in emergency_avoidance --decisions fsm --seeds 42..51 --duration 20` → 30 次运行完成，三场景任务成功率 1.000 [0.722, 1.000]；
+  - `export_core_figures.py` → 5 张核心图写入 `results/competition_pack/figures/`；
+  - 任务级回归：Game 20 s 未汇入 → `success=0`；交叉口驶出道路 → `success=0`；核心 FSM 三场景 → `success=1`。
+- **未完成/边界**：Game 汇入死锁、EM/QP 多 seed 统计、MPC 紧急制动、Pacejka 标定、交叉口、真实 highD、30–50 seeds、PPT/视频仍未完成；这些均列入未来工作。
+
+## 2026-10-20 (历史记录，已被 v0.4-core 取代：完善 FSM 与 Game 决策差异度、基准元数据追溯与工程治理)
+
+> 说明：本节的 Game 50.4%/34.9% 对比结论已作废——v0.4-core 审计发现 Game 在 20 s 内未完成汇入，任务不等价，不能作为主结果。
 
 - **修改文件**：`src/decision/game_theoretic.py`、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`configs/scenarios/highway_merge.yaml`、`src/evaluation/benchmark.py`、`.gitignore`、`results/README.md`、`requirements.txt`、`.github/workflows/ci.yml`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。
 - **修改内容**：

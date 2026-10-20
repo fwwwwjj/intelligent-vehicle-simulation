@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 批量基准场景评测与自动化打分脚本。
-对 FSM 与博弈决策、多个随机种子做闭环回归，输出 results/benchmark.json / csv。
+核心基准默认 FSM（Game 为探索性模块，需显式指定），对多个随机种子做闭环回归，输出 results/benchmark.json / csv。
 """
 
 import argparse
@@ -16,7 +16,13 @@ from src.evaluation.benchmark import BenchmarkSuite
 def main():
     parser = argparse.ArgumentParser(description="批量基准评测")
     parser.add_argument("--scenarios", nargs="+", default=["highway_merge"], help="场景名称或路径")
-    parser.add_argument("--decisions", nargs="+", default=["fsm", "game"], choices=["fsm", "game"])
+    parser.add_argument(
+        "--decisions",
+        nargs="+",
+        default=["fsm"],
+        choices=["fsm", "game"],
+        help="核心基准默认 FSM；game 为探索性模块，需显式指定",
+    )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
     parser.add_argument("--duration", type=float, default=20.0)
     parser.add_argument("--output-dir", default="results", help="结果输出目录")

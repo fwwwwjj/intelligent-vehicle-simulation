@@ -2,7 +2,7 @@
 """
 单场景闭环仿真运行脚本。
 从 configs/scenarios/*.yaml（或内置场景）加载路网、自车与障碍物，
-装配 FSM/博弈决策、Frenet Lattice 规划、LQR 控制，输出真实 KPI。
+装配核心 FSM、Frenet Lattice、LQR 控制，输出任务级 KPI；Game/EM/MPC/Pacejka 为未来工作接口。
 """
 
 import argparse
@@ -22,16 +22,16 @@ from src.runner import build_engine
 def main():
     parser = argparse.ArgumentParser(description="智能车辆行为决策与路径规划数字仿真系统")
     parser.add_argument("--scenario", type=str, default="highway_merge", help="场景名称或 YAML/JSON 路径")
-    parser.add_argument("--decision", type=str, default="fsm", choices=["fsm", "game"], help="决策算法")
+    parser.add_argument("--decision", type=str, default="fsm", choices=["fsm", "game"], help="决策算法；game 为探索性/未来工作")
     parser.add_argument("--duration", type=float, default=20.0, help="仿真运行时长 (秒)")
     parser.add_argument("--no_vis", action="store_true", help="禁用实时可视化窗口")
     parser.add_argument("--seed", type=int, default=None, help="随机种子；默认使用场景配置")
     parser.add_argument("--config", type=str, default=None, help="默认配置文件路径")
     parser.add_argument("--save_results", action="store_true", help="保存逐帧 telemetry JSON 与 KPI")
-    parser.add_argument("--dynamic", action="store_true", help="使用 2-DOF 动力学模型")
-    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"], help="规划器")
-    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"], help="控制器")
-    parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"], help="轮胎模型")
+    parser.add_argument("--dynamic", action="store_true", help="使用 2-DOF 动力学模型（未来工作）")
+    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"], help="规划器；em 为未来工作")
+    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"], help="控制器；mpc 为未来工作")
+    parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"], help="轮胎模型；pacejka 为未来工作")
     args = parser.parse_args()
 
     if args.scenario.endswith((".yaml", ".yml", ".json")):

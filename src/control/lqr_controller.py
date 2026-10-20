@@ -263,7 +263,9 @@ class LQRController(BaseController):
         lat_steer_limit = float(
             np.arctan(self.wheelbase * safe_a_lat_max / (v_now ** 2))
         )
-        steer_limit = min(self.max_steer, max(lat_steer_limit, 0.05))
+        # 数值下限只用于避免 0 除；不能把转角抬高到 0.05 rad，否则高速时会
+        # 直接突破 max_lateral_accel（22 m/s 下 0.05 rad 约对应 9 m/s²）。
+        steer_limit = min(self.max_steer, max(lat_steer_limit, 1e-3))
         steer_target = float(np.clip(steer_fb + steer_ff, -steer_limit, steer_limit))
 
         max_delta = self.max_steer_rate * dt * rate_scale

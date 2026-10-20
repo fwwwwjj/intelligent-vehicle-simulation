@@ -8,7 +8,7 @@
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -32,6 +32,8 @@ class SimulationMetricsRecord:
     distance_traveled: float = 0.0
     collision_count: int = 0
     planner_fallback: bool = False
+    planner_invalid: bool = False
+    safety_brake: bool = False
     controller_fallback: bool = False
 
 
@@ -41,13 +43,36 @@ class PerformanceEvaluator:
     """
     def __init__(self):
         self.records: List[SimulationMetricsRecord] = []
+        # 任务级结果由 SimulationEngine 按场景判定后写入；直接使用本评估器
+        # （例如单元测试）时保持 None，回退为“无碰撞即成功”的旧口径。
+        self.task_success: Optional[bool] = None
+        self.task_completed: bool = False
+        self.task_completion_time: Optional[float] = None
+        self.road_departure: bool = False
 
     def record_step(self, step_record: SimulationMetricsRecord) -> None:
         """记录单步指标"""
         self.records.append(step_record)
 
+    def set_task_result(
+        self,
+        success: bool,
+        completed: bool,
+        completion_time: Optional[float] = None,
+        road_departure: bool = False,
+    ) -> None:
+        """写入任务级判定结果（由闭环引擎按场景调用）。"""
+        self.task_success = bool(success)
+        self.task_completed = bool(completed)
+        self.task_completion_time = completion_time
+        self.road_departure = bool(road_departure)
+
     def reset(self) -> None:
         self.records.clear()
+        self.task_success = None
+        self.task_completed = False
+        self.task_completion_time = None
+        self.road_departure = False
 
     def compute_summary_report(self) -> Dict[str, float]:
         """
@@ -71,10 +96,23 @@ class PerformanceEvaluator:
         collision_obstacle_count = sum(r.collision_count for r in self.records)
         collision_frame_count = sum(1 for r in self.records if r.is_collision)
         planner_fallbacks = sum(1 for r in self.records if r.planner_fallback)
+        planner_invalids = sum(1 for r in self.records if r.planner_invalid)
+        safety_brakes = sum(1 for r in self.records if r.safety_brake)
         controller_fallbacks = sum(1 for r in self.records if r.controller_fallback)
 
+        task_success = self.task_success
+        if task_success is None:
+            # 兼容直接使用 PerformanceEvaluator 的旧调用方/单元测试。
+            task_success = collision_obstacle_count == 0
+
         report = {
-            "success_rate": 0.0 if collision_obstacle_count > 0 else 1.0,
+            "success_rate": 1.0 if task_success else 0.0,
+            "task_success": 1.0 if task_success else 0.0,
+            "task_completed": 1.0 if self.task_completed else 0.0,
+            "task_completion_time_s": (
+                float(self.task_completion_time) if self.task_completion_time is not None else 999.0
+            ),
+            "road_departure": 1.0 if self.road_departure else 0.0,
             "collision_count": float(collision_obstacle_count),
             "collision_frames": float(collision_frame_count),
             "collision_rate": float(collision_frame_count / len(self.records)),
@@ -95,6 +133,10 @@ class PerformanceEvaluator:
             "max_control_latency_ms": float(np.max(control_latencies)),
             "planner_fallback_count": float(planner_fallbacks),
             "planner_fallback_rate": float(planner_fallbacks / len(self.records)),
+            "planner_invalid_count": float(planner_invalids),
+            "planner_invalid_rate": float(planner_invalids / len(self.records)),
+            "safety_brake_count": float(safety_brakes),
+            "safety_brake_rate": float(safety_brakes / len(self.records)),
             "controller_fallback_count": float(controller_fallbacks),
             "controller_fallback_rate": float(controller_fallbacks / len(self.records)),
             "distance_traveled_m": float(self.records[-1].distance_traveled),

@@ -499,7 +499,8 @@ class MPCController(BaseController):
         if self.max_lateral_accel is not None and self.max_lateral_accel > 0.0:
             safe_a_lat_max = min(self.max_lateral_accel, mu_g * 0.9)
             adhesion_steer_limit = float(np.arctan(self.wheelbase * safe_a_lat_max / (vx_now ** 2)))
-            effective_max_steer = min(self.max_steer, max(adhesion_steer_limit, 0.05))
+            # 与 LQR 一致：数值下限只防止 0 除，不能抬高到 0.05 rad。
+            effective_max_steer = min(self.max_steer, max(adhesion_steer_limit, 1e-3))
         else:
             effective_max_steer = self.max_steer
 

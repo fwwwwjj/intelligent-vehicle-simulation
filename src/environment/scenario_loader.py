@@ -201,7 +201,7 @@ CUT_IN_DICT: Dict[str, Any] = {
             "behavior_type": "constant_speed",
         },
     ],
-    "traffic": {"enable_mobil": True, "lane_width": 3.75},
+    "traffic": {"enable_mobil": False, "lane_width": 3.75},
 }
 
 
