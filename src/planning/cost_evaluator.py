@@ -26,8 +26,9 @@ class TrajectoryCostEvaluator:
         self,
         w_collision: float = 1_000_000.0,
         w_jerk: float = 2.0,
+        w_lateral_jerk: float = 3.0,
         w_accel: float = 1.0,
-        w_ref_deviation: float = 5.0,
+        w_ref_deviation: float = 3.0,
         w_target_speed: float = 3.0,
         w_clearance: float = 50.0,
         w_lateral_accel: float = 1.0,
@@ -39,6 +40,7 @@ class TrajectoryCostEvaluator:
     ):
         self.w_collision = w_collision
         self.w_jerk = w_jerk
+        self.w_lateral_jerk = w_lateral_jerk
         self.w_accel = w_accel
         self.w_ref_deviation = w_ref_deviation
         self.w_target_speed = w_target_speed
@@ -76,6 +78,7 @@ class TrajectoryCostEvaluator:
         cost_collision = 0.0
         cost_clearance = 0.0
         cost_lateral_accel = 0.0
+        cost_lateral_jerk = 0.0
         valid = True
 
         for pt in trajectory.points:
@@ -92,6 +95,16 @@ class TrajectoryCostEvaluator:
             # 横向加速度惩罚：抑制“急打方向”的候选轨迹
             a_lat = (pt.v ** 2) * pt.kappa
             cost_lateral_accel += (a_lat ** 2) * dt
+
+        # Lateral jerk estimated in Frenet path coordinates. Curvature-rate
+        # captures steering transients and suppresses sharp S-shaped nudges.
+        for i in range(1, len(trajectory.points)):
+            prev, pt = trajectory.points[i - 1], trajectory.points[i]
+            delta_t = max(1e-3, pt.t - prev.t)
+            lat_acc_prev = prev.v ** 2 * prev.kappa
+            lat_acc = pt.v ** 2 * pt.kappa
+            lateral_jerk = (lat_acc - lat_acc_prev) / delta_t
+            cost_lateral_jerk += lateral_jerk ** 2 * delta_t
 
             if not obstacles:
                 continue
@@ -126,6 +139,7 @@ class TrajectoryCostEvaluator:
             + self.w_accel * cost_accel
             + self.w_target_speed * cost_speed_dev
             + self.w_lateral_accel * cost_lateral_accel
+            + self.w_lateral_jerk * cost_lateral_jerk
             + cost_clearance
         )
         trajectory.total_cost = float(total_cost)

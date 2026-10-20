@@ -85,6 +85,7 @@ class FrenetLatticePlanner(BasePlanner):
         self.ego_width = ego_width
         self.max_accel = max_accel
         self.max_decel = max_decel
+        self.max_curvature = float(np.tan(0.65) / 2.85)
 
     # ------------------------------------------------------------------
     # 参考线兜底
@@ -254,13 +255,12 @@ class FrenetLatticePlanner(BasePlanner):
             for obs in obstacles
         )
         if nearby_obstacle:
-            lateral_targets = sorted({base_l, base_l - 0.5, base_l + 0.5})
+            lateral_targets = self._adaptive_lateral_targets(
+                ego_frenet, reference_line, obstacles, base_l
+            )
         else:
             lateral_targets = [base_l]
-        horizons = sorted({
-            max(4.0, plan_time_horizon * 0.8),
-            max(4.0, plan_time_horizon),
-        })
+        horizons = [max(4.0, plan_time_horizon)]
         # 只把 80m 内的障碍物送入碰撞检查
         relevant_obstacles = [
             obs for obs in obstacles
@@ -268,6 +268,21 @@ class FrenetLatticePlanner(BasePlanner):
         ]
 
         candidates: List[Trajectory] = []
+        # Keep the total lattice within nine trajectories, even with three time
+        # horizons. Prefer obstacle-side alternatives over redundant centering.
+        max_targets = max(1, 9 // len(horizons))
+        if len(lateral_targets) > max_targets:
+            lateral_targets = sorted(lateral_targets, key=lambda value: (abs(value - base_l), value))[:max_targets]
+        if nearby_obstacle and len(lateral_targets) > 3:
+            # Retain center, the nearest viable side, and one larger nudge.
+            sides = [value for value in lateral_targets if value != base_l]
+            lateral_targets = [base_l]
+            for sign in (-1.0, 1.0):
+                side = sorted((v for v in sides if np.sign(v - base_l) == sign), key=lambda v: abs(v-base_l))
+                if side:
+                    lateral_targets.append(side[0])
+                    if len(lateral_targets) < 3 and len(side) > 1:
+                        lateral_targets.append(side[-1])
         for horizon in horizons:
             for target_l in lateral_targets:
                 traj = self._build_candidate(
@@ -279,6 +294,15 @@ class FrenetLatticePlanner(BasePlanner):
                     dt=dt,
                 )
                 if traj is None or not traj.points:
+                    continue
+                if any(
+                    abs(pt.v ** 2 * pt.kappa) > 3.0 + 1e-6
+                    or abs(pt.kappa) > self.max_curvature + 1e-6
+                    for pt in traj.points
+                ):
+                    traj.valid = False
+                    traj.total_cost = float("inf")
+                    candidates.append(traj)
                     continue
                 self.cost_evaluator.evaluate(traj, relevant_obstacles, target_speed, dt=dt)
                 # 参考线依从度：偏离目标车道中心越远，代价越高（避免无必要地
@@ -297,3 +321,44 @@ class FrenetLatticePlanner(BasePlanner):
         valid = [traj for traj in candidates if traj.valid]
         pool = valid if valid else candidates
         return min(pool, key=lambda traj: traj.total_cost)
+
+    def _adaptive_lateral_targets(
+        self,
+        ego_frenet: FrenetPoint,
+        reference_line: List[ReferencePoint],
+        obstacles: List[ObstacleState],
+        base_l: float,
+    ) -> List[float]:
+        """Generate a compact set of targets from nearby Frenet free corridors."""
+        # The lateral reference may already be lane center or an adjacent lane
+        # target. Use the standard road lane extent plus a safety shoulder so a
+        # vehicle can perform an in-lane nudge around a narrow stationary object.
+        lane_half_width = 3.0
+        left_limit, right_limit = base_l + lane_half_width, base_l - lane_half_width
+        left_clearance, right_clearance = lane_half_width, lane_half_width
+        for obs in obstacles:
+            op = FrenetConverter.cartesian_to_frenet(
+                VehicleState(x=obs.x, y=obs.y, heading=obs.heading,
+                             velocity=float(np.hypot(obs.vx, obs.vy))),
+                reference_line,
+            )
+            half_s = 0.5 * obs.length + 0.5 * self.ego_length
+            obs_s_min, obs_s_max = op.s - half_s, op.s + half_s
+            if obs_s_max < ego_frenet.s - 3.0 or obs_s_min > ego_frenet.s + 50.0:
+                continue
+            # Obstacle-free corridor width (vehicle clearance is checked by OBB SAT).
+            half_l = 0.5 * obs.width + 0.2
+            obs_l_min, obs_l_max = op.l - half_l, op.l + half_l
+            # A blocker spanning the lane center leaves two possible passages:
+            # measure the available width from its outer edge to each road edge.
+            if obs_l_max >= base_l:
+                left_clearance = min(left_clearance, left_limit - obs_l_max)
+            if obs_l_min <= base_l:
+                right_clearance = min(right_clearance, obs_l_min - right_limit)
+
+        targets = [base_l]
+        if left_clearance > 2.2:
+            targets.extend((base_l + 0.8, base_l + 1.2, base_l + 1.6))
+        if right_clearance > 2.2:
+            targets.extend((base_l - 0.8, base_l - 1.2, base_l - 1.6))
+        return sorted(set(float(np.clip(v, right_limit + 0.1, left_limit - 0.1)) for v in targets))[:7]
