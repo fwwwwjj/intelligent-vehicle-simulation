@@ -12,7 +12,7 @@ import math
 import platform
 from pathlib import Path
 import subprocess
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -29,12 +29,18 @@ class BenchmarkSuite:
         seeds: Iterable[int] = (42,),
         duration: float = 20.0,
         use_dynamic_model: bool = False,
+        planner: Optional[str] = None,
+        controller: Optional[str] = None,
+        tire_model: Optional[str] = None,
     ):
         self.scenario_configs = scenario_configs
         self.decisions = tuple(decisions)
         self.seeds = tuple(seeds)
         self.duration = float(duration)
         self.use_dynamic_model = use_dynamic_model
+        self.planner = planner
+        self.controller = controller
+        self.tire_model = tire_model
         self.results: Dict[str, Dict[str, Any]] = {}
         self.group_summary: List[Dict[str, Any]] = []
 
@@ -50,12 +56,19 @@ class BenchmarkSuite:
             seed=seed,
             enable_visualization=False,
             use_dynamic_model=self.use_dynamic_model,
+            planner=self.planner,
+            controller=self.controller,
+            tire_model=self.tire_model,
         )
         report = engine.run(max_duration=self.duration)
         return {
             "scenario": scenario_name,
             "decision": decision,
             "seed": seed,
+            "planner": self.planner or "config",
+            "controller": self.controller or "config",
+            "tire_model": self.tire_model or "config",
+            "dynamic_model": bool(engine.use_dynamic_model),
             **report,
         }
 

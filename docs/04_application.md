@@ -31,10 +31,12 @@
 ### 2.3 虚拟仿真实验教学
 - 学生可直接观察跟驰、汇入、紧急制动三种行为，以及 LQR/PID 参数变化对跟踪误差与舒适性的影响；
 - 通过 `--decision fsm|game` 对比规则决策与收益矩阵决策；
-- 通过 `--dynamic` 切换运动学/2-DOF 动力学，观察模型差异。
+- 通过 `--dynamic` 切换运动学/2-DOF 动力学；通过 `--tire linear|pacejka` 观察轮胎非线性与载荷转移对高速跟踪的影响；
+- 通过 `--planner lattice|em` 与 `--controller lqr|mpc` 对比采样规划/优化规划、LQR/MPC 的控制差异。
 
 ### 2.4 学术算法原型验证
 - 系统提供 `BasePlanner` / `BaseDecisionMaker` / `BaseController` 抽象接口，新增算法只需实现对应接口；
+- `src/common/qp.py` 提供纯 NumPy QP 后端，可作为 MPC/EM 教学与原型验证的最小依赖示例；
 - 但不建议把本系统当作高保真 3D 物理引擎；它更适合验证决策/规划/控制逻辑与 KPI 链路。
 
 ---

@@ -28,6 +28,15 @@ ego_vehicle:
   max_accel: 3.5               # 最大驱动加速度 (m/s^2)
   max_decel: 7.0               # 最大制动减速度 (m/s^2)
   max_jerk: 4.0                # 最大加加速度限制，保障乘客舒适性 (m/s^3)
+  tire_model: "linear"         # linear | pacejka
+  friction_coefficient: 0.90   # 路面附着系数 (Pacejka 峰值力)
+  cg_height: 0.55              # 质心高度 (m)，用于纵向载荷转移
+  pacejka:
+    B: 10.0
+    C: 1.3
+    D_scale: 0.95
+    E: -0.97
+    load_sensitivity: 0.0
 
 # 传感器数字模型 (感知层抽象)
 sensor_model:
@@ -43,3 +52,30 @@ environment:
   lane_width: 3.75             # 标准车道宽度 (米)
   speed_limit: 22.22           # 道路限速 (m/s, 约80km/h)
   friction_coefficient: 0.85   # 路面附着系数 (干燥沥青路面)
+
+# 规划器与控制器选择 (v0.3)
+planning:
+  planner: "lattice"            # lattice | em
+  em:
+    path_ds: 2.0                # 路径 QP 站距 (m)
+    path_length: 80.0           # 路径优化前瞻长度 (m)
+    speed_dt: 0.2               # 速度 QP 时间步 (s)
+    speed_horizon: 6.0          # 速度优化时域 (s)
+    max_speed: 30.0             # 速度 QP 上界 (m/s)
+    safe_gap: 2.0               # S-T 跟驰/停车安全净距 (m)
+    lateral_clearance: 0.25     # 路径走廊横向余量 (m)
+
+control:
+  controller: "lqr"             # lqr | mpc
+  mpc:
+    prediction_horizon: 20      # 预测步数
+    control_horizon: 10         # 控制步数
+    q_lateral: 10.0
+    q_heading: 6.0
+    q_speed: 1.0
+    r_accel: 0.08
+    r_steer: 0.8
+    r_accel_rate: 0.6
+    r_steer_rate: 6.0
+    lateral_error_limit: 0.9    # 横向软约束 (m)
+    heading_error_limit: 0.0    # 航向软约束 (rad)，0 表示关闭

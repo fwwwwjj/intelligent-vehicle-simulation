@@ -114,21 +114,31 @@ class IDMCalibrator:
             success = bool(res.success)
             best_x = res.x
         else:
-            # 简易网格/坐标轮换回退搜索 (零外部依赖保证)
+            # 无 scipy 时的零依赖回退：多轮坐标轮换 + 逐轮收缩搜索区间。
+            # 单轮 9 点网格在参数强耦合时容易停在 RMSE≈0.7 的粗解，因此这里
+            # 每轮围绕当前最优点做局部细化，直到不再改进或达到轮数上限。
             best_x = list(x0)
             best_rmse = initial_rmse
-            for idx in range(len(keys)):
-                low, high = bnds[idx]
-                for val in np.linspace(low, high, 9):
-                    cand = list(best_x)
-                    cand[idx] = float(val)
-                    m = IntelligentDriverModel(
-                        v0=cand[0], s0=cand[1], T=cand[2], a_max=cand[3], b_desired=cand[4]
-                    )
-                    rmse = self.compute_rmse(m, samples)
-                    if rmse < best_rmse:
-                        best_rmse = rmse
-                        best_x = cand
+            for round_idx in range(6):
+                improved = False
+                for idx in range(len(keys)):
+                    low, high = bnds[idx]
+                    span = (high - low) / (2.0 ** min(round_idx, 4))
+                    local_low = max(low, best_x[idx] - span)
+                    local_high = min(high, best_x[idx] + span)
+                    for val in np.linspace(local_low, local_high, 25):
+                        cand = list(best_x)
+                        cand[idx] = float(val)
+                        m = IntelligentDriverModel(
+                            v0=cand[0], s0=cand[1], T=cand[2], a_max=cand[3], b_desired=cand[4]
+                        )
+                        rmse = self.compute_rmse(m, samples)
+                        if rmse < best_rmse - 1e-12:
+                            best_rmse = rmse
+                            best_x = cand
+                            improved = True
+                if not improved:
+                    break
             success = True
 
         opt_params = {keys[i]: float(best_x[i]) for i in range(len(keys))}

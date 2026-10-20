@@ -29,6 +29,9 @@ def main():
     parser.add_argument("--config", type=str, default=None, help="默认配置文件路径")
     parser.add_argument("--save_results", action="store_true", help="保存逐帧 telemetry JSON 与 KPI")
     parser.add_argument("--dynamic", action="store_true", help="使用 2-DOF 动力学模型")
+    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"], help="规划器")
+    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"], help="控制器")
+    parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"], help="轮胎模型")
     args = parser.parse_args()
 
     if args.scenario.endswith((".yaml", ".yml", ".json")):
@@ -36,10 +39,15 @@ def main():
     else:
         scenario = load_named_scenario(args.scenario)
 
+    planner_name = args.planner or scenario.planning_params.get("planner", "lattice")
+    controller_name = args.controller or scenario.control_params.get("controller", "lqr")
+    tire_name = args.tire or scenario.vehicle_params.get("tire_model", "linear")
+
     print("==================================================")
     print("启动智能车辆仿真系统 - 中国仿真创新应用大赛")
     print(f"场景: {scenario.name}  |  {scenario.description}")
-    print(f"决策: {args.decision.upper()}  |  步长: {scenario.dt:.3f}s  |  种子: {args.seed or scenario.seed}")
+    print(f"决策: {args.decision.upper()}  |  规划: {planner_name.upper()}  |  控制: {controller_name.upper()}")
+    print(f"轮胎: {tire_name.upper()}  |  步长: {scenario.dt:.3f}s  |  种子: {args.seed or scenario.seed}")
     print("==================================================")
 
     engine = build_engine(
@@ -48,6 +56,9 @@ def main():
         seed=args.seed,
         enable_visualization=not args.no_vis,
         use_dynamic_model=args.dynamic,
+        planner=args.planner,
+        controller=args.controller,
+        tire_model=args.tire,
     )
 
     print(">>> 仿真运行中...")

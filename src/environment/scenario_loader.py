@@ -45,12 +45,49 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "max_accel": 3.5,
         "max_decel": 7.0,
         "max_jerk": 4.0,
+        "tire_model": "linear",
+        "friction_coefficient": 0.9,
+        "cg_height": 0.55,
+        "pacejka": {
+            "B": 10.0,
+            "C": 1.3,
+            "D_scale": 0.95,
+            "E": -0.97,
+            "load_sensitivity": 0.0,
+        },
     },
     "sensor_model": {
         "lidar_range": 80.0,
         "lidar_fov": 360.0,
         "noise_std_position": 0.05,
         "noise_std_velocity": 0.10,
+    },
+    "planning": {
+        "planner": "lattice",
+        "em": {
+            "path_ds": 2.0,
+            "path_length": 80.0,
+            "speed_dt": 0.2,
+            "speed_horizon": 6.0,
+            "max_speed": 30.0,
+            "safe_gap": 2.0,
+            "lateral_clearance": 0.25,
+        },
+    },
+    "control": {
+        "controller": "lqr",
+        "mpc": {
+            "prediction_horizon": 20,
+            "control_horizon": 10,
+            "q_lateral": 10.0,
+            "q_heading": 6.0,
+            "q_speed": 1.0,
+            "r_accel": 0.08,
+            "r_steer": 0.8,
+            "r_accel_rate": 0.6,
+            "r_steer_rate": 6.0,
+            "lateral_error_limit": 0.9,
+        },
     },
     "environment": {
         "lane_width": 3.75,
@@ -172,8 +209,10 @@ class Scenario:
     ego_state: VehicleState
     current_lane_id: str
     dt: float = 0.05
-    vehicle_params: Dict[str, float] = field(default_factory=dict)
+    vehicle_params: Dict[str, Any] = field(default_factory=dict)
     sensor_params: Dict[str, float] = field(default_factory=dict)
+    planning_params: Dict[str, Any] = field(default_factory=dict)
+    control_params: Dict[str, Any] = field(default_factory=dict)
     seed: int = 42
     max_duration: float = 40.0
 
@@ -344,13 +383,20 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
         ego_state=ego_state,
         current_lane_id=current_lane_id,
         dt=float(sim_cfg.get("time_step", 0.05)),
-        vehicle_params={k: float(v) for k, v in vehicle_cfg.items()},
+        vehicle_params={
+            k: float(v)
+            if isinstance(v, (int, float))
+            else (dict(v) if isinstance(v, dict) else v)
+            for k, v in vehicle_cfg.items()
+        },
         sensor_params={
             "max_range": float(sensor_cfg.get("lidar_range", 80.0)),
             "fov_deg": float(sensor_cfg.get("lidar_fov", 360.0)),
             "pos_noise_std": float(sensor_cfg.get("noise_std_position", 0.05)),
             "vel_noise_std": float(sensor_cfg.get("noise_std_velocity", 0.10)),
         },
+        planning_params=dict(config.get("planning", {})),
+        control_params=dict(config.get("control", {})),
         seed=int(sim_cfg.get("random_seed", 42)),
         max_duration=float(sim_cfg.get("max_simulation_time", 40.0)),
     )

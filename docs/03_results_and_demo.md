@@ -33,7 +33,7 @@
 
 ## 3. 当前实测结果
 
-仓库当前没有随附基准原始输出，因此本节不列未经追溯的实验数字。复现实验命令如下，执行后会写出逐次 JSON/CSV 与分组汇总 CSV：
+仓库当前没有随附基准原始输出，因此本节不列未经追溯的实验数字。EM/QP、MPC、Pacejka 已通过单元/集成测试与短时 CLI 冒烟，但尚未纳入基准结果表，不能作为性能结论。复现实验命令如下，执行后会写出逐次 JSON/CSV 与分组汇总 CSV：
 
 ```bash
 python3 scripts/run_benchmark.py --scenarios highway_merge emergency_avoidance --decisions fsm game --seeds 42 --duration 20
@@ -74,6 +74,39 @@ JSON 保留运行参数、逐次结果和按场景/决策器分组的均值与�
 
 - 目前没有仓库内保存的多 seed 基准结果，不能据此支撑统计性结论；正式报告应保存运行参数和原始结果，并明确样本数与置信区间。
 - `highway_merge` 的 FSM/Game 分流不明显，需要增加“密集主线车流”“后车逼近”“相邻车道间隙不足”等更对抗的参数组合。
-- 尚未接入 highD / INTERACTION 真实轨迹；当前结果不能称为“真实数据驱动标定”。
+- 已具备 highD 格式解析、微型演示切片与 IDM 标定工具链，但尚未接入 INTERACTION/NGSIM 与全量生产数据；当前不能称为“全量真实数据驱动标定”。
 - 规划平均时延约 8–9 ms，但单步最大时延仍可能超过 20 ms，硬实时结论需要更多测量与优化。
-- EM/QP、MPC 和 Pacejka 主回路尚未实现，详见 README “当前实现边界”。MOBIL 已进入环境步进，但需由场景配置启用并用实际运行验证。
+- EM/QP、MPC、Pacejka 已作为可切换算法进入主回路，但目前只完成单元/集成测试与短时冒烟，尚未做多 seed、长时程统计；详见 [docs/06_qp_mpc_em_pacejka.md](06_qp_mpc_em_pacejka.md)。
+- MOBIL 换道已进入环境步进（场景 `traffic.enable_mobil` 可控），但尚未做大规模换道安全性统计。
+- INTERACTION/NGSIM 与全量 highD 生产标定仍未接入，当前不能称为“真实数据驱动生产标定”。
+
+
+---
+
+## 6. 新算法框架验证（单 seed / 短时）
+
+以下命令只用于确认“接口可调用、闭环可运行、约束可检查”，不作为性能排名：
+
+```bash
+# EM/QP + MPC + Pacejka 短时闭环
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
+  nice -n 19 python3 -B scripts/run_simulation.py \
+  --scenario emergency_avoidance --decision fsm \
+  --planner em --controller mpc --tire pacejka \
+  --duration 5 --no_vis
+
+# 定向单元/集成测试（低功耗）
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
+  nice -n 19 python3 -B -m unittest \
+  tests.test_qp_solver tests.test_mpc_controller \
+  tests.test_em_planner tests.test_pacejka_tire \
+  tests.test_optimized_closed_loop -v
+```
+
+验证口径：
+
+- QP 返回 `success` 与 `constraint_violation`，调用方不会把未收敛解静默当作硬约束；
+- MPC 的 `last_solve_info` 记录迭代数、残差与回退状态；
+- EM 的 `last_path_result` / `last_speed_result` 记录 QP 成功/回退状态；
+- Pacejka 分支可通过 `engine.dynamic_model.tire_model == "pacejka"` 检查；
+- 所有短时运行仍由逐帧 KPI 记录，不以硬编码数字代替。

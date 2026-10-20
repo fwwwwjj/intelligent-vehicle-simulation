@@ -5,6 +5,7 @@
 from src.common.state import VehicleState, TrajectoryPoint, Trajectory, ObstacleState, ObstacleType
 from src.common.geometry import BoundingBox2D, Point2D, CollisionChecker
 from src.common.frenet_frame import FrenetPoint, FrenetConverter, ReferencePoint
+from src.common.qp import QPSolution, solve_qp
 
 __all__ = [
     "VehicleState",
@@ -18,4 +19,6 @@ __all__ = [
     "FrenetPoint",
     "FrenetConverter",
     "ReferencePoint",
+    "QPSolution",
+    "solve_qp",
 ]

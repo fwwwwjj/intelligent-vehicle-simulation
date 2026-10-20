@@ -20,7 +20,16 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
     parser.add_argument("--duration", type=float, default=20.0)
     parser.add_argument("--output-dir", default="results", help="结果输出目录")
-    parser.add_argument("--dynamic-model", action="store_true", help="使用 2-DOF 动力学模型")
+    parser.add_argument(
+        "--dynamic-model",
+        "--dynamic",
+        dest="dynamic_model",
+        action="store_true",
+        help="使用 2-DOF 动力学模型",
+    )
+    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"])
+    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"])
+    parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"])
     args = parser.parse_args()
 
     print(">>> 启动批量场景基准评测...")
@@ -30,6 +39,9 @@ def main():
         seeds=args.seeds,
         duration=args.duration,
         use_dynamic_model=args.dynamic_model,
+        planner=args.planner,
+        controller=args.controller,
+        tire_model=args.tire,
     )
     results = suite.run_all()
     json_path, csv_path, summary_csv_path = suite.save(args.output_dir)

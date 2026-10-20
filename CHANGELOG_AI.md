@@ -1,5 +1,19 @@
 # AI 修改记录
 
+## 2026-10-19 (QP/MPC/EM/Pacejka 主回路 + 远端 MOBIL/标定整合)
+
+- **修改文件**：`src/common/qp.py`、`src/control/mpc_controller.py`、`src/planning/em_planner.py`、`src/vehicle_model/tire.py`、`src/vehicle_model/dynamics.py`、`src/runner.py`、`src/simulator.py`、`src/environment/scenario_loader.py`、`configs/default_config.yaml`、`scripts/run_simulation.py`、`scripts/run_benchmark.py`、`docs/06_qp_mpc_em_pacejka.md`、新增 5 个测试文件及相关文档。
+- **修改内容**：
+  1. 新增纯 NumPy ADMM QP 后端，支持盒约束、线性约束、过松弛、自适应 rho、热启动与残差诊断；
+  2. 实现 LTV-MPC 轨迹跟踪控制器，包含执行机构/速率硬约束、横向软约束、QP 失败回退与 `last_solve_info` 诊断；
+  3. 实现 EM/QP 路径-速度解耦规划器：路径 QP + S-T 图速度 QP + 终端速度保护 + 安全回退；
+  4. 将 Pacejka 稳态魔术公式、载荷转移与简化摩擦椭圆接入 2-DOF 动力学主回路，并保留线性轮胎分支；
+  5. 打通 `planner=lattice|em`、`controller=lqr|mpc`、`tire_model=linear|pacejka` 的配置/装配/CLI 切换；
+  6. 与远端 MOBIL 换道、IDM 加速度外推、`cut_in` 场景、highD 微型切片、IDM 标定工具链及 benchmark 汇总功能合并，解决 `scenario_loader`、`benchmark`、文档与 CLI 冲突；
+  7. 改进无 scipy 环境下的 IDM 标定回退搜索（多轮坐标轮换 + 区间收缩），使 `tests/test_calibration.py` 在零外部优化器环境下通过。
+- **验证方式及结果**：低功耗模式（单线程 BLAS + `nice`）运行 `python3 -B -m unittest discover tests`，**61 项全部通过（约 1.7 s）**；`git diff --check` 通过；`cut_in` 与 `emergency_avoidance` 各 10 步短时闭环冒烟通过。未运行长时间多 seed benchmark，避免机器持续发热。
+- **未完成/边界**：INTERACTION/NGSIM 与全量 highD 生产标定、城市无保护路口、OpenSCENARIO/ROS/CARLA 联仿仍未接入；EM/MPC/Pacejka 仅完成框架、单元/集成测试与短时冒烟，尚未做多 seed 统计。本次为本地提交后与 `origin/main` 的 rebase 整合，推送需远端认证。
+
 ## 2026-10-19
 
 - **修改文件**：`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/evaluation/benchmark.py`、`scripts/run_benchmark.py`、`configs/scenarios/highway_merge.yaml`、`configs/scenarios/cut_in.yaml`、`tests/test_closed_loop.py`、`tests/test_obstacle_manager.py`、`tests/test_metrics.py`、`AI_SYSTEM_SPEC.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG_AI.md`

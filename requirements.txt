@@ -17,5 +17,6 @@ typing-extensions>=4.5.0
 
 # 说明：
 # - cvxpy / osqp / pygame / seaborn / shapely 当前未使用，已从必需依赖中移除；
-# - 实现 EM/QP 或 MPC 时再按需加入 cvxpy / osqp；
+# - EM/QP 与 MPC 使用 src/common/qp.py 的纯 NumPy ADMM，无需 cvxpy / osqp；
+#   如需更高性能，可安装 osqp 后替换 QP 后端；
 # - 无 SciPy 时 LQR 会回退到 numpy Riccati 迭代，仍可运行测试。

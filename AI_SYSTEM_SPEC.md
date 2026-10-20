@@ -1,7 +1,7 @@
 # 智能车辆仿真系统：全栈架构规范、变量量纲口径与 AI 协作开发指南
 ### Intelligent Vehicle Simulation System: Architecture, Conventions, and AI Collaboration Specification
 
-> **版本**：v0.2（2026-10-18）。本版同步 P0 闭环改造：真实 KPI、YAML/JSON 场景加载、Frenet Lattice 接真实参考线、时间索引 LQR、接口边界表。骨架基线为 commit `b53b9ba`，P0 实现为 commit `e701687`。
+> **版本**：v0.3（2026-10-19）。本版在 v0.2 闭环基线上补齐 **EM/QP 规划器、LTV-MPC 控制器、Pacejka 轮胎主回路** 与**纯 NumPy QP 后端**，并把“未实现接口必须显式失败”的规则收窄到 INTERACTION/NGSIM、全量生产标定、OpenSCENARIO 等仍未完成项。v0.2 的 P0 基线为 commit `e701687`。
 
 > **说明文档定位**：本规范文件为本项目（中国仿真创新应用大赛参赛作品）的**单一真实数据源（Single Source of Truth, SSOT）**。旨在统一整个系统内部的所有数学物理坐标系、状态变量命名口径、量纲单位及模块间交互契约。
 > 
@@ -26,7 +26,7 @@
 ### 1. 车辆机体坐标系 (Vehicle Coordinate System)
 - **遵循标准**：**ISO 8855 / SAE J670** 车辆动力学坐标系；
 - **原点**：车辆后轴中心点（运动学自行车模型）或车辆质心点（二自由度动力学模型）；
-- **v0.2 实现口径**：`KinematicBicycleModel` 以**后轴中心**为位姿参考点；`DynamicBicycleModel` 以**质心**为位姿参考点。`SimulationEngine` 通过 `use_dynamic_model` 切换模型时**没有做后轴/质心原点平移**，因此跨模型对比实验必须固定同一模型，或先显式做原点变换。
+- **v0.3 实现口径**：`KinematicBicycleModel` 以**后轴中心**为位姿参考点；`DynamicBicycleModel` 以**质心**为位姿参考点。`SimulationEngine` 通过 `use_dynamic_model` 切换模型时**没有做后轴/质心原点平移**，因此跨模型对比实验必须固定同一模型，或先显式做原点变换。`DynamicBicycleModel` 的 `tire_model` 可取 `linear` 或 `pacejka`；选择 `pacejka` 时 `SimulationEngine` 自动启用动力学模型。
 - **X 轴**：沿车身纵轴指向正前方，前向为正；
 - **Y 轴**：垂直于车身纵轴指向左侧，左侧为正；
 - **Z 轴**：垂直于地面指向天空，天向为正（右手系）；
@@ -210,6 +210,8 @@ sequenceDiagram
 ### 3. `src/vehicle_model/` (物理机理层)
 - **职责**：智能车辆物理与数字孪生计算；
 - **动力学模型约束**：输入必须是 `(state, accel_cmd, steer_cmd, dt)`，输出必须是步进更新后的 `VehicleState`；严禁在动力学模型内部处理决策或路径搜索逻辑。
+- **轮胎模型契约**：`DynamicBicycleModel(tire_model="linear"|"pacejka")`。`linear` 分支保持原有公式与积分顺序；`pacejka` 分支使用 `PacejkaTireModel.lateral_force/combined_lateral_force`，并显式计算前/后轴载荷转移。`pacejka_tire_model()` 仅作为兼容接口保留。
+- **边界**：Pacejka 为稳态纯侧偏 + 简化摩擦椭圆，不包含松弛长度、温度/胎压与完整试验标定。
 
 ### 4. `src/decision/` (行为决策层)
 - **职责**：宏观战略意图判定，输出高层指令 `DecisionOutput`；
@@ -223,15 +225,27 @@ sequenceDiagram
   - 输出：`Trajectory`（由若干按时间递增排列的 `TrajectoryPoint` 组成）；
 - **平滑性要求（验收目标）**：轨迹应尽量保证曲率 $\kappa$ 连续、加速度 $a$ 在物理极限以内；
 - **v0.2 实现**：`FrenetLatticePlanner` 用五次多项式生成候选，`kappa/dkappa` 由离散 $\theta(s)$ 差分计算；通过横向加速度代价、加速度越界 `valid=False` 与 OBB 碰撞校验进行约束，属于**软约束 + 候选筛选**，不是数学上的硬保证。若无任何无碰撞候选，返回综合代价最低的轨迹并置 `valid=False`，控制器仍会执行制动/跟踪。
+- **v0.3 新增 EM/QP**：`EMPlanner` 执行“路径 QP + 速度 QP”的路径-速度解耦。路径 QP 优化 `l(s)`（道路边界、起点位姿、障碍物单侧凸走廊，带松弛）；速度 QP 优化 `v(t)`（速度/加速度/加加速度边界、S-T 图跟驰/停车上界）。终端速度保护用于避免时域截断后追尾。QP 失败时分别退化为 smoothstep 横移与带制动距离约束的速度剖面，且仍执行 OBB 碰撞校验。
+- **边界**：不是 Apollo EM 的完整迭代 E/M 收敛；动态障碍物走廊采用当前/预测轨迹的单侧凸近似。
 
 ### 6. `src/control/` (运动控制层)
 - **职责**：跟踪规划轨迹，抑制扰动；
 - **输入输出契约**：根据当前 `VehicleState` 与 `Trajectory`，计算出 `ControlCommand`（转向角、期望加速度、油门/制动开度、转角速率）。
-- **当前实现**：`LQRController` 使用时间索引预瞄 + 曲率前馈 + 横向加速度/转角速率限制；纵向复用 `LongitudinalPIDController`，并对目标速度做一阶低通、对加速度做 jerk 限制。`MPCController` 仍为接口骨架。
+- **当前实现**：`LQRController` 使用时间索引预瞄 + 曲率前馈 + 横向加速度/转角速率限制；纵向复用 `LongitudinalPIDController`，并对目标速度做一阶低通、对加速度做 jerk 限制。
+- **v0.3 新增 LTV-MPC**：`MPCController` 以 `[e_y, e_psi, e_v]` 误差状态和 `[a, delta]` 控制量构建预测 QP，约束含执行机构硬边界、jerk/转角速率硬约束与横向软约束（slack）。QP 由 `src/common/qp.py` 求解；失败时回退为曲率前馈 PD + 纵向 P，并在 `last_solve_info` 记录诊断。
+- **边界**：不是非线性 NMPC；预测模型不包含 Pacejka 轮胎动力学。
 
 ### 7. `src/runner.py` (装配层)
-- **职责**：把 `Scenario` 装配为 `SimulationEngine`，统一读取车辆参数、传感器参数、决策器/规划器/控制器；
+- **职责**：把 `Scenario` 装配为 `SimulationEngine`，统一读取车辆参数、传感器参数、决策器/规划器/控制器/轮胎模型；
+- **算法选择**：`build_planner(scenario, planner="lattice"|"em")`、`build_controller(scenario, controller="lqr"|"mpc")`、`build_engine(..., tire_model="linear"|"pacejka")`；优先级为显式参数 > 场景配置 > 默认值；
 - **禁止项**：装配层不得包含决策、规划或控制算法逻辑，也不得硬编码与场景 YAML 不一致的世界参数。
+
+### 8. `src/common/qp.py` (优化后端)
+- **职责**：为 MPC 与 EM 提供统一的稠密凸 QP 求解；
+- **形式**：`min 0.5 x'Px + q'x s.t. l <= Ax <= u, lb <= x <= ub`；
+- **实现**：纯 NumPy ADMM（OSQP 风格，支持过松弛、自适应 rho、热启动）；
+- **契约**：调用方必须检查 `QPSolution.success` 与 `constraint_violation`；未收敛解不得被表述为硬约束保证；
+- **边界**：不承诺硬实时；`max_planning_latency_ms` 必须在目标机器实测。
 
 ---
 
@@ -244,9 +258,9 @@ sequenceDiagram
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
 3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
-4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过；当前测试数量以实际运行输出为准。
+4. 【单元测试先行】：每新增或深度重构一个核心类，必须在 tests/ 目录下补充对应的 unittest 单元测试，确保运行 `python3 -m unittest discover tests` 100% 通过；当前测试数量以实际运行输出为准。低功耗环境下建议限制 BLAS 线程并使用 `nice`。
 5. 【文档同步更新】：若对核心参数、类接口做了增删，必须同步更新 docs/ 下对应的大赛技术支撑报告。
-6. 【未实现接口必须显式失败】：EM/QP、MPC 等尚未实现的算法，调用入口必须抛出 NotImplementedError，禁止返回空 Trajectory / 零控制量冒充有效输出。
+6. 【未实现接口必须显式失败】：INTERACTION/NGSIM 数据接入、OpenSCENARIO/ROS/CARLA 联合仿真等尚未实现的入口必须抛出 NotImplementedError 或返回明确的“不支持”状态，禁止返回空 Trajectory / 零控制量冒充有效输出。EM/QP 与 MPC 已实现，失败时必须返回可诊断的回退结果（`last_path_result` / `last_speed_result` / `last_solve_info`），不得静默伪装成功。
 7. 【结果由脚本生成】：KPI 表、曲线与对比数字必须由 scripts/ 下的运行/评测脚本生成；单 seed 结果必须标注，禁止手填或复制旧文档数字。
 ```
 
@@ -267,13 +281,17 @@ sequenceDiagram
 | 轨迹规划 | `src/planning/frenet_lattice.py` | 五次多项式 + 时间投影 OBB 碰撞校验 + 曲率/jerk 填充 |
 | 行为决策 | `src/decision/rule_based_fsm.py` / `game_theoretic.py` | 跟驰、汇入、紧急停车；2×2 收益矩阵 |
 | 横向控制 | `src/control/lqr_controller.py` | 时间索引预瞄 + 曲率前馈 + 横向加速度限制 |
+| LTV-MPC | `src/control/mpc_controller.py` | 误差动力学 + QP 硬/软约束 + 回退诊断 |
 | 纵向控制 | `src/control/pid_controller.py` | 测量值微分 + 抗积分饱和 |
-| 车辆模型 | `src/vehicle_model/kinematics.py` / `dynamics.py` | 运动学 / 2-DOF 线性轮胎 |
+| EM/QP 规划 | `src/planning/em_planner.py` | 路径 QP + ST 速度 QP + 终端速度保护 |
+| QP 后端 | `src/common/qp.py` | 纯 NumPy ADMM + 热启动 + 残差诊断 |
+| 车辆模型 | `src/vehicle_model/kinematics.py` / `dynamics.py` | 运动学 / 2-DOF 线性或 Pacejka 轮胎 |
+| Pacejka 轮胎 | `src/vehicle_model/tire.py` | 稳态魔术公式 + 载荷转移 + 简化摩擦椭圆 |
 | 交通演化与换道 | `src/environment/obstacle_manager.py` | IDM 跟驰 + 加速度外推；MOBIL 换道状态机（支持平滑三次多项式过渡） |
 | 数据集解析与演示 | `src/environment/dataset_loader.py` | highD 格式 CSV 解析；微型演示切片 `scripts/generate_sample_highd.py` |
 | 参数标定工具链 | `src/environment/calibration.py` | 基于非线性优化的 IDM 跟驰参数系统辨识 |
 | KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、OBB 净距、TTC、横向/航向误差、Δa/Δt jerk、时延拆分 |
-| 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 多决策 × 多场景；JSON 保留配置、逐次结果和分组汇总，CSV 分别输出原始运行与分组统计 |
+| 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 多决策 × 多场景 × planner/controller/tire；JSON 保留配置、逐次结果和分组汇总，CSV 分别输出原始运行与分组统计 |
 
 ### 2. 仅接口预留 / 未实现
 
@@ -281,10 +299,8 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | INTERACTION / NGSIM | 接口骨架，返回元数据/空列表 | “已接入 INTERACTION/NGSIM” |
 | 全量实测数据生产标定 | 具备标定工具链与微型演示切片；仓库未附带数十 GB 全量数据 | “已用全量实车数据完成生产标定” |
-| EM / QP 规划 | `em_planner.py::plan` 抛出 `NotImplementedError` | “已实现 EM 规划器” |
-| MPC | `mpc_controller.py::compute_control` 抛出 `NotImplementedError` | “已实现 MPC 跟踪” |
-| Pacejka 轮胎 | `pacejka_tire_model()` 未被 `step()` 调用 | “已采用 Pacejka 非线性轮胎” |
 | OpenSCENARIO / ROS / CARLA | 占位函数或规划 | “已支持联合仿真” |
+| 大规模多 seed 统计 | 当前仅单 seed/短时冒烟 | “统计显著优于基线” |
 
 ### 3. 指标口径
 
@@ -294,6 +310,7 @@ sequenceDiagram
 - **Jerk**：实际加速度差分 `Δa/Δt`，不是轨迹理论值。
 - **横向误差**：自车到规划轨迹最近点的 cross-track 误差。
 - **时延**：决策、规划、控制分别计时，禁止合并成一个 `planning_latency_ms`。
+- **QP 诊断**：MPC 用 `last_solve_info`（status/success/iterations/residual/violation），EM 用 `last_path_result` / `last_speed_result`（success/iterations/constraint_violation/note）记录求解质量；回退次数与最大时延必须单独报告。
 - **碰撞计数**：`collision_count` 为逐帧碰撞障碍物数量之和；`collision_frames` 为发生碰撞的帧数；单次 `success_rate` 是 0/1 结果。批量汇总中的 `success_rate_mean` 是逐次二值结果的均值，并给出 Wilson 95% 区间；其他数值指标报告均值与样本标准差（单样本标准差记 0）。
 - **长度口径**：`TrajectoryPoint.s` 是参考线站距，不是实际路径弧长；大横向偏移时两者有差异。
 
@@ -302,3 +319,4 @@ sequenceDiagram
 - 结果表必须由 `scripts/run_benchmark.py` 或 `scripts/run_simulation.py --save_results` 生成；批量基准写出 `benchmark.json`、原始运行 `benchmark.csv` 和分组 `benchmark_summary.csv`；
 - 至少报告 seed、场景、时长、样本数；单 seed 结果不得写成统计结论；
 - 早期文档中的 99.2%、4.6 m、0.86 m/s³、12.5 ms 等数字已无代码依据，禁止再次引用。
+- EM/QP、MPC、Pacejka 的短时冒烟结果不得写成“统计显著优于 LQR/Lattice”；单 seed 表只描述该次运行。

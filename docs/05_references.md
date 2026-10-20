@@ -23,10 +23,10 @@ intelligent-vehicle-simulation/
 │   │   ├── scenario_loader.py  # YAML/JSON 场景 -> 路网/障碍物/自车
 │   │   ├── obstacle_manager.py # IDM 步进与预测轨迹
 │   │   └── dataset_loader.py   # highD 格式 CSV 解析；INTERACTION/NGSIM 为接口（未附带数据）
-│   ├── vehicle_model/          # 运动学、2-DOF 线性轮胎、传感器模型；Pacejka 预留
+│   ├── vehicle_model/          # 运动学、2-DOF 线性/Pacejka 轮胎、传感器模型
 │   ├── decision/               # 分层有限状态机 (HFSM) 与收益矩阵博弈决策
-│   ├── planning/               # Frenet Lattice + OBB 碰撞校验；EM/QP 预留
-│   ├── control/                # LQR 横向跟踪 + 曲率前馈 + 纵向 PID；MPC 预留
+│   ├── planning/               # Frenet Lattice / EM-QP + OBB 碰撞校验
+│   ├── control/                # LQR / LTV-MPC + 曲率前馈 + 纵向 PID
 │   ├── evaluation/             # 真实 KPI 计算器与批量回归基准评测套件
 │   ├── visualization/          # 2D BEV 实时动画与真实遥测图表
 │   ├── runner.py               # 场景 -> 决策/规划/控制/引擎装配工厂

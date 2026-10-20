@@ -46,11 +46,12 @@ class SimulationEngine:
         enable_visualization: bool = True,
         dt: float = 0.05,
         seed: int = 42,
-        vehicle_params: Optional[Dict[str, float]] = None,
+        vehicle_params: Optional[Dict[str, Any]] = None,
         sensor_params: Optional[Dict[str, float]] = None,
         initial_lane_id: str = "main_lane_0",
         plan_dt: float = 0.1,
         plan_horizon: float = 5.0,
+        tire_model: Optional[str] = None,
     ):
         self.road_network = road_network
         self.obstacle_manager = obstacle_manager
@@ -58,7 +59,14 @@ class SimulationEngine:
         self.planner = planner
         self.controller = controller
         self.ego_state = ego_initial_state
-        self.use_dynamic_model = use_dynamic_model
+        self.tire_model = str(
+            tire_model
+            or (vehicle_params or {}).get("tire_model", "linear")
+        ).lower()
+        # Pacejka 轮胎只存在于 2-DOF 动力学模型；显式选择 Pacejka 时自动启用
+        self.use_dynamic_model = bool(
+            use_dynamic_model or self.tire_model == "pacejka"
+        )
         self.enable_visualization = enable_visualization
         self.dt = float(dt)
         self.plan_dt = float(plan_dt)
@@ -87,6 +95,10 @@ class SimulationEngine:
             lr=float(vp.get("lr", 1.50)),
             cf=float(vp.get("cf", 120000.0)),
             cr=float(vp.get("cr", 120000.0)),
+            tire_model=self.tire_model,
+            pacejka_params=vp.get("pacejka"),
+            friction_coefficient=float(vp.get("friction_coefficient", 0.9)),
+            cg_height=float(vp.get("cg_height", 0.55)),
         )
         sp = sensor_params or {}
         self.sensor_model = SensorModel(
