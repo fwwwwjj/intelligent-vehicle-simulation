@@ -1,0 +1,2 @@
+id,frameRate,locationId,speedLimit,month,year,startFrame,endFrame,duration,totalDrivenDistance,totalDrivenTime,numVehicles,numCars,numTrucks,lowerLaneMarkings,upperLaneMarkings
+1,25.0,1,120.0,10,2017,0,100,4.0,500.0,16.0,4,3,1,0.0;3.75;7.5,7.5;11.25;15.0

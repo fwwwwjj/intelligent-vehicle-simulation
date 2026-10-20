@@ -34,9 +34,15 @@ ENV/
 
 # Outputs & Logs
 logs/
-results/
+results/*
+!results/README.md
+!results/benchmark.json
+!results/benchmark.csv
+!results/benchmark_summary.csv
 data/raw/
 *.csv
+!results/*.csv
+!data/sample_highd/*.csv
 *.bag
 *.mp4
 *.gif

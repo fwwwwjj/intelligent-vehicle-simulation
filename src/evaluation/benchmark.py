@@ -46,7 +46,11 @@ class BenchmarkSuite:
 
     def _run_once(self, scenario_name: str, decision: str, seed: int) -> Dict[str, Any]:
         # 延迟导入，避免 evaluation -> benchmark -> simulator 的循环依赖
+        from src.control.lqr_controller import LQRController
+        from src.control.mpc_controller import MPCController
         from src.environment.scenario_loader import load_named_scenario
+        from src.planning.em_planner import EMPlanner
+        from src.planning.frenet_lattice import FrenetLatticePlanner
         from src.runner import build_engine
 
         scenario = load_named_scenario(scenario_name)
@@ -61,13 +65,29 @@ class BenchmarkSuite:
             tire_model=self.tire_model,
         )
         report = engine.run(max_duration=self.duration)
+
+        resolved_planner = (
+            "em"
+            if isinstance(engine.planner, EMPlanner)
+            else ("lattice" if isinstance(engine.planner, FrenetLatticePlanner) else type(engine.planner).__name__.lower())
+        )
+        resolved_controller = (
+            "mpc"
+            if isinstance(engine.controller, MPCController)
+            else ("lqr" if isinstance(engine.controller, LQRController) else type(engine.controller).__name__.lower())
+        )
+        resolved_tire = str(engine.tire_model).lower()
+
         return {
             "scenario": scenario_name,
             "decision": decision,
             "seed": seed,
-            "planner": self.planner or "config",
-            "controller": self.controller or "config",
-            "tire_model": self.tire_model or "config",
+            "planner": resolved_planner,
+            "controller": resolved_controller,
+            "tire_model": resolved_tire,
+            "planner_arg": self.planner or "config",
+            "controller_arg": self.controller or "config",
+            "tire_model_arg": self.tire_model or "config",
             "dynamic_model": bool(engine.use_dynamic_model),
             **report,
         }
