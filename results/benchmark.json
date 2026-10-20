@@ -30,8 +30,8 @@
     "experimental": false,
     "experimental_reasons": [],
     "python_version": "3.9.6",
-    "git_commit": "f7e8440d31f89e178a721d3ba19037860067b412",
-    "git_dirty": true,
+    "git_commit": "ea19674ecf44dee90d43cb12b24a5a28ca3e020f",
+    "git_dirty": false,
     "scenario_sha256": {
       "highway_merge": "b33e91853edda8bee801ea30ef51309990e26bd7af423394f6f00c894794e1fa",
       "cut_in": "f1242c611b412add30137597ee29c58e52fa679f0725706c2f9697a04f5530a4",
