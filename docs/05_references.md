@@ -21,7 +21,8 @@ intelligent-vehicle-simulation/
 │   ├── 05_references.md        # 代码体系与参考文献
 │   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
 │   ├── 07_scope_and_future_work.md  # 范围与未来工作清单
-│   └── 08_paper_draft.md        # 论文草稿（v0.4-core）
+│   ├── 08_paper_draft.md        # 论文草稿（v0.4-core）
+│   └── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
 ├── src/                        # 核心仿真引擎与算法接口
 │   ├── common/                 # 车辆状态、Frenet 映射、OBB 碰撞、QP 后端
 │   ├── environment/            # 道路网络、场景加载、IDM/MOBIL、highD 解析

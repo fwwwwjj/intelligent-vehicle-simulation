@@ -114,4 +114,5 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `docs/06` | 未来工作技术储备：QP/MPC/EM/Pacejka |
 | `docs/07` | 本文件：范围与未来工作清单 |
 | `docs/08` | 论文草稿：核心链路、任务指标、10-seed 结果与局限 |
+| `docs/09` | 答辩 PPT 与演示视频大纲 |
 | `AI_SYSTEM_SPEC.md` | SSOT：接口/量纲/验收口径 |

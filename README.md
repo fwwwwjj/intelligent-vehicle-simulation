@@ -215,7 +215,7 @@ python3 scripts/export_core_figures.py --seed 42 --duration 20 \
 | `emergency_avoidance` | 1.000 [0.722, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.04 / 2.61 |
 
 > 任务成功率 = 完成任务 + 无碰撞 + 不驶出道路，不是“未碰撞”。详细定义、逐 seed 结果与复现命令见 [docs/03_results_and_demo.md](docs/03_results_and_demo.md) 和 `results/`。
-> 图表见 `results/competition_pack/figures/`；论文草稿见 [docs/08_paper_draft.md](docs/08_paper_draft.md)。
+> 图表见 `results/competition_pack/figures/`；论文草稿见 [docs/08_paper_draft.md](docs/08_paper_draft.md)；答辩/视频大纲见 [docs/09_slides_and_video_outline.md](docs/09_slides_and_video_outline.md)。
 
 ---
 
