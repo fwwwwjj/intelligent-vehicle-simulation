@@ -158,7 +158,9 @@ class BenchmarkSuite:
         try:
             dirty = bool(
                 subprocess.run(
-                    ["git", "status", "--porcelain"],
+                    # 生成产物本身不算“代码脏”；否则每次跑完 benchmark 都会把
+                    # git_dirty 置 True，无法区分“代码未提交”和“结果刚被重写”。
+                    ["git", "status", "--porcelain", "--", ".", ":(exclude)results"],
                     check=True,
                     capture_output=True,
                     text=True,
