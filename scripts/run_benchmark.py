@@ -20,8 +20,8 @@ def main():
         "--decisions",
         nargs="+",
         default=["fsm"],
-        choices=["fsm", "game"],
-        help="核心基准默认 FSM；game 为探索性模块，需显式指定",
+        choices=["fsm", "game", "idm", "fsm_no_lane_change"],
+        help="核心基准默认 FSM；idm 为经典基线，fsm_no_lane_change 为决策消融，game 为探索性模块",
     )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
     parser.add_argument("--duration", type=float, default=20.0)
@@ -33,8 +33,8 @@ def main():
         action="store_true",
         help="使用 2-DOF 动力学模型",
     )
-    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"])
-    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"])
+    parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em", "centerline"])
+    parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc", "pure_pursuit"])
     parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"])
     parser.add_argument(
         "--allow-experimental",

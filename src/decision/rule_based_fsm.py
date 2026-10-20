@@ -31,6 +31,7 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
         merge_follow_gap: float = 15.0,
         ego_length: float = 4.8,
         ego_width: float = 1.9,
+        enable_lane_change: bool = True,
     ):
         self.desired_speed = desired_speed
         self.min_ttc_threshold = min_ttc_threshold
@@ -39,6 +40,8 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
         self.merge_follow_gap = merge_follow_gap
         self.ego_length = float(ego_length)
         self.ego_width = float(ego_width)
+        # 消融实验开关：关闭后 HFSM 只做本车道巡航/跟驰，不再产生汇入/换道意图。
+        self.enable_lane_change = bool(enable_lane_change)
         self.current_state = DrivingIntent.CRUISE
 
     # ------------------------------------------------------------------
@@ -93,6 +96,8 @@ class HierarchicalFSMDecisionMaker(BaseDecisionMaker):
         return closest_obs, min_gap
 
     def _merge_target_lane(self, current_lane_id: str) -> Optional[str]:
+        if not self.enable_lane_change:
+            return None
         if self.road_network is None:
             return None
         if "ramp" not in current_lane_id:

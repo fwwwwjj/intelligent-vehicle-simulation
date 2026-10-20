@@ -48,7 +48,9 @@ class BenchmarkSuite:
         # 延迟导入，避免 evaluation -> benchmark -> simulator 的循环依赖
         from src.control.lqr_controller import LQRController
         from src.control.mpc_controller import MPCController
+        from src.control.pure_pursuit_controller import PurePursuitController
         from src.environment.scenario_loader import load_named_scenario
+        from src.planning.centerline_planner import CenterlinePlanner
         from src.planning.em_planner import EMPlanner
         from src.planning.frenet_lattice import FrenetLatticePlanner
         from src.runner import build_engine
@@ -69,12 +71,28 @@ class BenchmarkSuite:
         resolved_planner = (
             "em"
             if isinstance(engine.planner, EMPlanner)
-            else ("lattice" if isinstance(engine.planner, FrenetLatticePlanner) else type(engine.planner).__name__.lower())
+            else (
+                "centerline"
+                if isinstance(engine.planner, CenterlinePlanner)
+                else (
+                    "lattice"
+                    if isinstance(engine.planner, FrenetLatticePlanner)
+                    else type(engine.planner).__name__.lower()
+                )
+            )
         )
         resolved_controller = (
             "mpc"
             if isinstance(engine.controller, MPCController)
-            else ("lqr" if isinstance(engine.controller, LQRController) else type(engine.controller).__name__.lower())
+            else (
+                "pure_pursuit"
+                if isinstance(engine.controller, PurePursuitController)
+                else (
+                    "lqr"
+                    if isinstance(engine.controller, LQRController)
+                    else type(engine.controller).__name__.lower()
+                )
+            )
         )
         resolved_tire = str(engine.tire_model).lower()
 

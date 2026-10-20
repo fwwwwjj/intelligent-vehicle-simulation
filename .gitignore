@@ -42,9 +42,12 @@ results/*
 !results/competition_pack/
 !results/competition_pack/README.md
 !results/competition_pack/kpi_table.md
+!results/contrast/
+!results/contrast/**
 data/raw/
 *.csv
 !results/*.csv
+!results/contrast/*.csv
 !data/sample_highd/*.csv
 *.bag
 *.mp4

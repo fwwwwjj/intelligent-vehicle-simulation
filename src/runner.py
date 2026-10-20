@@ -15,11 +15,14 @@ from typing import Optional
 from src.control.base_controller import BaseController
 from src.control.lqr_controller import LQRController
 from src.control.mpc_controller import MPCController
+from src.control.pure_pursuit_controller import PurePursuitController
 from src.decision.base_decision import BaseDecisionMaker
 from src.decision.game_theoretic import GameTheoreticDecisionMaker
+from src.decision.idm_decision import IDMDecisionMaker
 from src.decision.rule_based_fsm import HierarchicalFSMDecisionMaker
 from src.environment.scenario_loader import Scenario
 from src.planning.base_planner import BasePlanner
+from src.planning.centerline_planner import CenterlinePlanner
 from src.planning.em_planner import EMPlanner
 from src.planning.frenet_lattice import FrenetLatticePlanner
 from src.simulator import SimulationEngine
@@ -41,6 +44,21 @@ def build_decision_maker(scenario: Scenario, decision: str) -> BaseDecisionMaker
         )
     if decision == "fsm":
         return HierarchicalFSMDecisionMaker(
+            road_network=scenario.road_network,
+            ego_length=ego_length,
+            ego_width=ego_width,
+        )
+    if decision == "fsm_no_lane_change":
+        # 消融：保留规则跟驰/紧急制动，但关闭汇入/换道决策，用于量化战术决策层贡献。
+        return HierarchicalFSMDecisionMaker(
+            road_network=scenario.road_network,
+            ego_length=ego_length,
+            ego_width=ego_width,
+            enable_lane_change=False,
+        )
+    if decision == "idm":
+        # 经典基线：IDM 自适应巡航 + 本车道保持，不做战术换道。
+        return IDMDecisionMaker(
             road_network=scenario.road_network,
             ego_length=ego_length,
             ego_width=ego_width,
@@ -79,6 +97,16 @@ def build_controller(
     if name == "lqr":
         return LQRController(**common)
 
+    if name == "pure_pursuit":
+        return PurePursuitController(
+            wheelbase=common["wheelbase"],
+            max_steer=common["max_steer"],
+            max_steer_rate=common["max_steer_rate"],
+            max_accel=common["max_accel"],
+            max_decel=common["max_decel"],
+            max_jerk=common["max_jerk"],
+        )
+
     if name == "mpc":
         mpc_cfg = dict(params.get("mpc", {}))
         return MPCController(
@@ -115,6 +143,14 @@ def build_planner(scenario: Scenario, planner: Optional[str] = None) -> BasePlan
 
     if name == "lattice":
         return FrenetLatticePlanner(
+            ego_length=float(vp.get("length", 4.8)),
+            ego_width=float(vp.get("width", 1.9)),
+            max_accel=float(vp.get("max_accel", 3.5)),
+            max_decel=float(vp.get("max_decel", 7.0)),
+        )
+
+    if name == "centerline":
+        return CenterlinePlanner(
             ego_length=float(vp.get("length", 4.8)),
             ego_width=float(vp.get("width", 1.9)),
             max_accel=float(vp.get("max_accel", 3.5)),
