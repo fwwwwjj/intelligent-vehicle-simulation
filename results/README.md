@@ -29,7 +29,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 - 10 seeds 是**轻量基准**，用于确认链路与统计管线；论文目标为每条件 30–50 seeds；
 - 建议分批运行，保持单线程 BLAS + `nice -n 19`，避免机器持续高负载；
 - 运行后检查 `benchmark.json.metadata.git_commit`、`git_dirty` 与场景 SHA256，确保数字可追溯；
-- 当前 `results/` 是在 v0.4-core 修改尚未提交的工作区生成的，`git_dirty=true`；正式提交前建议提交代码并重跑一次，或在论文中注明“working tree at 217583d + scope changes”。
+- 本次 `results/` 在 commit `9e227db` 的干净工作区生成：`git_dirty=false`；`results/` 产物本身已从 dirty 判定中排除。
 
 ---
 
@@ -75,14 +75,14 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 | 场景 | n | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | 10 | 1.000 [0.722, 1.000] | 1.84 ± 0.00 | 20.42 ± 0.11 | 2.012 ± 0.022 | 0.060 ± 0.000 | 3.02 / 4.26 |
-| `cut_in` | 10 | 1.000 [0.722, 1.000] | 5.53 ± 0.15 | 1.76 ± 0.04 | 1.824 ± 0.041 | 0.073 ± 0.004 | 2.61 / 6.59 |
-| `emergency_avoidance` | 10 | 1.000 [0.722, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.05 / 2.60 |
+| `highway_merge` | 10 | 1.000 [0.722, 1.000] | 1.84 ± 0.00 | 20.42 ± 0.11 | 2.012 ± 0.022 | 0.060 ± 0.000 | 3.06 / 4.41 |
+| `cut_in` | 10 | 1.000 [0.722, 1.000] | 5.53 ± 0.15 | 1.76 ± 0.04 | 1.824 ± 0.041 | 0.073 ± 0.004 | 2.56 / 6.47 |
+| `emergency_avoidance` | 10 | 1.000 [0.722, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.04 / 2.61 |
 
 > 环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`。以上数字由当前工作区生成；论文/答辩引用时请同时给出 commit、seed 列表与命令。
 >
 > 诊断字段：`planner_invalid_count` 均值分别为 highway_merge 0.1、cut_in 11.1、emergency_avoidance 30.3；`safety_brake_count` 均为 0。invalid 主要来自远端碰撞/加速度越界，未触发急刹；下一步重规划继续。
-> `results/` 的 `git_dirty=true` 表示基准在未提交工作区生成；正式使用前提交并重跑。
+> 本次基准 `git_commit=9e227db`、`git_dirty=false`；若重新生成，`results/` 产物本身不会把 dirty 置 True。
 
 ---
 
