@@ -57,22 +57,22 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
   --decisions fsm \
-  --seeds 42 43 44 45 46 47 48 49 50 51 \
+  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 \
   --duration 20.0
 ```
 
 ### 3.2 结果表
 
-环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 10 seeds，20 s 闭环；成功率附 Wilson 95% 置信区间。
+环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`；每组 15 seeds，20 s 闭环；成功率附 Wilson 95% 置信区间。
 
 | 场景 | 决策 | n | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 最大横向加速度 (m/s²) | 任务完成时间 (s) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | FSM | 10 | 1.000 [0.722, 1.000] | 1.84 ± 0.00 | 20.42 ± 0.11 | 2.012 ± 0.022 | 0.060 ± 0.000 | 2.500 ± 0.000 | 11.72 ± 0.03 | 3.06 / 4.41 |
-| `cut_in` | FSM | 10 | 1.000 [0.722, 1.000] | 5.53 ± 0.15 | 1.76 ± 0.04 | 1.824 ± 0.041 | 0.073 ± 0.004 | 2.510 ± 0.000 | — | 2.56 / 6.47 |
-| `emergency_avoidance` | FSM | 10 | 1.000 [0.722, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 0.000 ± 0.000 | — | 2.04 / 2.61 |
+| `highway_merge` | FSM | 15 | 1.000 [0.796, 1.000] | 1.84 ± 0.01 | 20.42 ± 0.11 | 2.007 ± 0.020 | 0.060 ± 0.000 | 2.500 ± 0.000 | 11.71 ± 0.03 | 3.08 / 4.31 |
+| `cut_in` | FSM | 15 | 1.000 [0.796, 1.000] | 5.50 ± 0.15 | 1.75 ± 0.04 | 1.832 ± 0.043 | 0.074 ± 0.004 | 2.510 ± 0.000 | — | 2.66 / 6.75 |
+| `emergency_avoidance` | FSM | 15 | 1.000 [0.796, 1.000] | 14.10 ± 0.15 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 0.000 ± 0.000 | — | 2.08 / 2.58 |
 
 > 说明：
-> - 10 seeds 是**轻量基准**，用于确认链路和统计管线；论文目标为每条件 30–50 seeds；
+> - 15 seeds 是**轻量基准**，用于确认链路和统计管线；论文目标为每条件 30–50 seeds；
 > - `task_completion_time_s=999` 表示该场景没有离散“完成时刻”（cut_in/emergency 用终态判据），不是“999 秒完成”；
 > - 所有场景 `road_departure=0`、`collision_frames=0`；
 > - 规划时延是单机实测，受硬件/负载影响；论文需报告 p50/p95/p99 与硬件环境。
@@ -109,7 +109,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
      --decisions fsm --seeds 42 43 44 --duration 20
    ```
 
-4. **核心图表**：`scripts/export_core_figures.py` 生成 3 张 BEV、1 张三场景遥测图、1 张 10-seed KPI 箱线图。
+4. **核心图表**：`scripts/export_core_figures.py` 生成 3 张 BEV、1 张三场景遥测图、1 张 15-seed KPI 箱线图。
    ```bash
    python3 scripts/export_core_figures.py --seed 42 --duration 20 \
      --output-dir results/competition_pack/figures
@@ -126,7 +126,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 ## 5. 当前局限
 
-- **样本量**：10 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
+- **样本量**：15 seeds 只用于轻量验证；论文需要 30–50 seeds、统计检验与效应量。
 - **场景多样性**：三个核心场景都是结构化道路/合成交通；尚无真实 highD 轨迹回放。
 - **车辆模型**：核心链路使用运动学自行车模型，不能体现轮胎侧滑/极限工况；2-DOF + Pacejka 属于未来工作。
 - **控制**：LQR 的横向加速度已限制在 2.5 m/s² 附近；但高速换道的舒适性仍有优化空间。
@@ -149,3 +149,25 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 8. **大规模统计**：30–50 seeds、参数扰动、SOTIF 边界场景。
 
 详见 [07_scope_and_future_work.md](07_scope_and_future_work.md) 与 [06_qp_mpc_em_pacejka.md](06_qp_mpc_em_pacejka.md)。
+
+---
+
+## 7. 真实 highD 最小可信版（数据可信度附录）
+
+当前 3.2 的主结果是合成场景闭环。为了提高数据可信度，仓库另外提供 **highD 最小可信版**：
+
+- `scripts/calibrate_highd.py`：从 highD 同车道跟驰片段提取样本，标定 IDM 的 `v0, s0, T, a_max, b_desired`，输出训练/验证 RMSE；
+- `scripts/replay_highd.py`：把一段真实 highD 轨迹按时间回放成 BEV 截图/GIF，检查坐标、车道映射与加载链路；
+- `src/environment/highd_tools.py`：样本提取、标定封装、直线路网构建。
+
+复现：
+
+```bash
+python3 scripts/calibrate_highd.py --data-root data/raw/highD --recording 01
+python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
+  --start-time 0 --duration 10 --step 0.5 --max-frames 12 --gif
+```
+
+> 这是**最小可信版**：只做同车道跟驰标定 + 开环回放，不做闭环交互，也不做全量生产标定。`data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，不能写成真实数据结论。详见 [10_highd_calibration_replay.md](10_highd_calibration_replay.md)。
+
+在论文中，这一节应放在“数据来源/实验设置”，并如实写出 recording ID、时间窗、样本数、许可；不能把开环回放写成“真实车流闭环验证”。

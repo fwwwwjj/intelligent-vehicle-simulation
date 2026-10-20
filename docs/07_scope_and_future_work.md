@@ -31,7 +31,7 @@
 | 车辆 | 运动学自行车模型 | `kinematics.py` | 闭环积分稳定 |
 | 安全监督 | 记录 invalid 轨迹；1 s 内即将碰撞时最小风险制动 | `simulator.py` | 记录 `planner_invalid` / `safety_brake` |
 | 评测 | 碰撞、OBB 净距、TTC、Jerk、横向/航向误差、时延、任务成功 | `simulator.py`、`metrics.py` | 逐帧记录 + 汇总 JSON/CSV |
-| 场景 | `highway_merge`、`cut_in`、`emergency_avoidance` | `configs/scenarios/` | 10 seeds 任务成功率 100% |
+| 场景 | `highway_merge`、`cut_in`、`emergency_avoidance` | `configs/scenarios/` | 15 seeds 任务成功率 100% |
 
 ### 2.1 核心任务成功判据
 
@@ -55,10 +55,12 @@
 | Pacejka `tire.py` | 稳态魔术公式 + 载荷转移 | 未做试验标定；与线性轮胎差异未统计 | 轮胎试验数据标定；与 2-DOF 主回路联调 |
 | 交叉口 `intersection_unprotected` | 拓扑/场景存在；车辆会冲过路口并驶出道路 | 任务不完成；决策层用中位数 y，看不到对向冲突车 | 局部 Frenet 车道查询；冲突点/路权；曲率限速 |
 | MOBIL 换道 | 已接入 `ObstacleManager.step()`，高速汇入启用 | 未做换道安全性统计 | 多场景换道安全/舒适统计 |
-| highD 真实标定 | CSV 解析器 + 合成微型样例 | 无真实数据、无标定结果 | 下载 highD 子集；`IDMCalibrator` 标定；回放 |
+| highD 真实标定 | **最小可信版脚本已提供**：跟驰样本提取 + IDM 标定 + 开环回放；仍缺真实数据运行结果 | 无真实数据、无本机标定结果 | 下载 highD 子集并运行 `scripts/calibrate_highd.py` / `replay_highd.py`；全量生产标定仍未来工作 |
 | OpenSCENARIO/ROS/CARLA | 占位/路线图 | 无中间件代码 | 后续工程化 |
 
 > 这些模块的代码不删除：保留接口、单元测试和切换开关，方便未来继续做；但论文/答辩中必须写成“未来工作/探索性原型”，不能写成“已完成并验证”。
+>
+> **代码级隔离（v0.4-core）**：CLI 默认拒绝运行实验性模块；必须显式加 `--allow-experimental`。批量评测会把 `experimental=true` 与 `experimental_reasons` 写入 JSON/CSV，避免与核心结果混表。
 
 ---
 
@@ -68,7 +70,7 @@
 
 - 核心链路：IDM 环境 → HFSM → Frenet Lattice → LQR → 运动学模型 → 任务级 KPI；
 - 任务级 success 的定义与实现；
-- 3 个核心场景、10 seeds 的闭环结果（论文目标 30 seeds）；
+- 3 个核心场景、15 seeds 的闭环结果（论文目标 30 seeds）；
 - 与“只报碰撞”的评测相比，任务级判据能识别“未汇入/驶出道路”的假成功；
 - 复杂算法作为 future work 的路线图。
 
@@ -78,7 +80,7 @@
 - “EM/QP、MPC、Pacejka 已完成多 seed 验证”；
 - “城市无保护左转已实现”；
 - “基于 highD 真实数据标定”；
-- “统计显著优于基线”（当前只有 10 seeds，且无基线对比）。
+- “统计显著优于基线”（当前只有 15 seeds，且无基线对比）。
 
 ---
 
@@ -91,11 +93,11 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
   --decisions fsm \
-  --seeds 42 43 44 45 46 47 48 49 50 51 \
+  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 \
   --duration 20.0
 ```
 
-- 10 seeds 是**轻量基准**，用于确认链路和统计管线；不是论文最终样本量；
+- 15 seeds 是**轻量基准**，用于确认链路和统计管线；不是论文最终样本量；
 - 论文目标：每条件 30–50 seeds；建议在空闲时段分批跑，每批不超过 10–15 seeds，保持单线程 BLAS + `nice`；
 - 运行后检查 `results/benchmark.json.metadata` 的 commit/场景 SHA256，确保数字可追溯。
 
@@ -108,11 +110,12 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `README.md` | 项目总览：核心链路 + 未来工作 |
 | `docs/01` | 问题来源与数据来源 |
 | `docs/02` | 数字模型：标注哪些是核心、哪些是未来工作 |
-| `docs/03` | 核心场景/指标/10-seed 结果 |
+| `docs/03` | 核心场景/指标/15-seed 结果 |
 | `docs/04` | 应用说明：核心 MIL/SIL + 未来 HIL/ROS/CARLA |
 | `docs/05` | 代码体系与参考文献 |
 | `docs/06` | 未来工作技术储备：QP/MPC/EM/Pacejka |
 | `docs/07` | 本文件：范围与未来工作清单 |
-| `docs/08` | 论文草稿：核心链路、任务指标、10-seed 结果与局限 |
+| `docs/08` | 论文草稿：核心链路、任务指标、15-seed 结果与局限 |
 | `docs/09` | 答辩 PPT 与演示视频大纲 |
+| `docs/10` | highD 最小可信版：标定 + 开环回放 |
 | `AI_SYSTEM_SPEC.md` | SSOT：接口/量纲/验收口径 |

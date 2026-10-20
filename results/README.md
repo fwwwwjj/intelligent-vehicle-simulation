@@ -1,6 +1,6 @@
 # 仿真基准评测产物与元数据说明 (Benchmark Results & Provenance)
 
-本目录记录 v0.4-core 的核心基准产物：**HFSM + Frenet Lattice + LQR + 运动学模型**，3 个核心场景 × 10 seeds × 20 s 闭环。所有数据由仓库内命令生成，带有 commit、场景 SHA256、Python 版本与逐次运行记录。
+本目录记录 v0.4-core 的核心基准产物：**HFSM + Frenet Lattice + LQR + 运动学模型**，3 个核心场景 × 15 seeds × 20 s 闭环。所有数据由仓库内命令生成，带有 commit、场景 SHA256、Python 版本与逐次运行记录。
 
 > 复杂算法（Game/EM/MPC/Pacejka/交叉口）不在本目录的主结果中；旧版产物已归档到 `results/archive/2026-10-20_pre_scope/`，不得再作为当前结论引用。范围说明见 [../docs/07_scope_and_future_work.md](../docs/07_scope_and_future_work.md)。
 
@@ -22,14 +22,14 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
   --decisions fsm \
-  --seeds 42 43 44 45 46 47 48 49 50 51 \
+  --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 \
   --duration 20.0
 ```
 
-- 10 seeds 是**轻量基准**，用于确认链路与统计管线；论文目标为每条件 30–50 seeds；
+- 15 seeds 是**轻量基准**，用于确认链路与统计管线；论文目标为每条件 30–50 seeds；
 - 建议分批运行，保持单线程 BLAS + `nice -n 19`，避免机器持续高负载；
 - 运行后检查 `benchmark.json.metadata.git_commit`、`git_dirty` 与场景 SHA256，确保数字可追溯；
-- 本次 `results/` 在 commit `9e227db` 的干净工作区生成：`git_dirty=false`；`results/` 产物本身已从 dirty 判定中排除。
+- 本次 `results/` 在干净工作区生成：`git_dirty=false`；具体 commit 见 `benchmark.json.metadata.git_commit`；`results/` 产物本身已从 dirty 判定中排除。
 
 ---
 
@@ -71,18 +71,18 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 
 ---
 
-## 4. 当前结果摘要（10 seeds）
+## 4. 当前结果摘要（15 seeds）
 
 | 场景 | n | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | 10 | 1.000 [0.722, 1.000] | 1.84 ± 0.00 | 20.42 ± 0.11 | 2.012 ± 0.022 | 0.060 ± 0.000 | 3.06 / 4.41 |
-| `cut_in` | 10 | 1.000 [0.722, 1.000] | 5.53 ± 0.15 | 1.76 ± 0.04 | 1.824 ± 0.041 | 0.073 ± 0.004 | 2.56 / 6.47 |
-| `emergency_avoidance` | 10 | 1.000 [0.722, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.04 / 2.61 |
+| `highway_merge` | 10 | 1.000 [0.796, 1.000] | 1.84 ± 0.00 | 20.42 ± 0.11 | 2.012 ± 0.022 | 0.060 ± 0.000 | 3.06 / 4.41 |
+| `cut_in` | 10 | 1.000 [0.796, 1.000] | 5.53 ± 0.15 | 1.76 ± 0.04 | 1.824 ± 0.041 | 0.073 ± 0.004 | 2.56 / 6.47 |
+| `emergency_avoidance` | 10 | 1.000 [0.796, 1.000] | 14.07 ± 0.14 | 2.37 ± 0.00 | 1.803 ± 0.003 | 0.000 ± 0.000 | 2.04 / 2.61 |
 
 > 环境：Python 3.9.6，Apple Silicon，单线程 BLAS，`nice -n 19`。以上数字由当前工作区生成；论文/答辩引用时请同时给出 commit、seed 列表与命令。
 >
 > 诊断字段：`planner_invalid_count` 均值分别为 highway_merge 0.1、cut_in 11.1、emergency_avoidance 30.3；`safety_brake_count` 均为 0。invalid 主要来自远端碰撞/加速度越界，未触发急刹；下一步重规划继续。
-> 本次基准 `git_commit=9e227db`、`git_dirty=false`；若重新生成，`results/` 产物本身不会把 dirty 置 True。
+> 本次基准 `git_dirty=false`；若重新生成，`results/` 产物本身不会把 dirty 置 True。commit 见 `benchmark.json.metadata.git_commit`。
 
 ---
 

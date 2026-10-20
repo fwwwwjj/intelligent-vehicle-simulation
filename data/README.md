@@ -59,3 +59,32 @@ obstacles = loader.get_frame_obstacles(0.0)
 calibrator = IDMCalibrator()
 # 从提取的跟驰样本中优化 IDM 参数 (v0, s0, T, a_max, b_desired)
 ```
+
+## 最小可信版：真实 highD 标定与开环回放
+
+把真实 recording 放到 `data/raw/highD/` 后：
+
+```bash
+# 1) IDM 跟驰参数标定
+python3 scripts/calibrate_highd.py \
+  --data-root data/raw/highD --recording 01 \
+  --max-samples 3000 --train-ratio 0.7
+
+# 2) 开环轨迹回放（BEV 截图 + JSON，可选 GIF）
+python3 scripts/replay_highd.py \
+  --data-root data/raw/highD --recording 01 \
+  --start-time 0 --duration 10 --step 0.5 --max-frames 12 --gif
+```
+
+输出：
+
+- `results/highd_calibration_01.json`
+- `results/highd_replay/frame_*.png`
+- `results/highd_replay/highd_replay_01.json`
+- 可选 `results/highd_replay/highd_replay_01.gif`
+
+说明：
+
+- 这是**最小可信版**：只做同车道跟驰标定 + 开环回放，不做闭环交互；
+- `data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，不能写成真实标定；
+- 详细口径、字段与论文写法见 [docs/10_highd_calibration_replay.md](../docs/10_highd_calibration_replay.md)。

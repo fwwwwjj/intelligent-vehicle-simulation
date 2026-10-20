@@ -89,6 +89,8 @@ class BenchmarkSuite:
             "controller_arg": self.controller or "config",
             "tire_model_arg": self.tire_model or "config",
             "dynamic_model": bool(engine.use_dynamic_model),
+            "experimental": bool(engine.experimental),
+            "experimental_reasons": list(engine.experimental_reasons),
             **report,
         }
 
@@ -205,6 +207,14 @@ class BenchmarkSuite:
                     "seeds": list(self.seeds),
                     "duration_s": self.duration,
                     "use_dynamic_model": self.use_dynamic_model,
+                    "experimental": any(
+                        bool(row.get("experimental")) for row in self.results.values()
+                    ),
+                    "experimental_reasons": sorted({
+                        reason
+                        for row in self.results.values()
+                        for reason in row.get("experimental_reasons", [])
+                    }),
                     "python_version": platform.python_version(),
                     **self._provenance_metadata(),
                     "success_rate_definition": "per-run task-level binary success (task completion + no collision + no road departure); mean with Wilson 95% interval",

@@ -7,7 +7,7 @@
 | 能力 | 当前状态 | 说明 |
 | :--- | :--- | :--- |
 | 纯 Python 闭环仿真（MIL/SIL） | ✅ 核心可用 | `SimulationEngine` 串联环境、感知、决策、规划、控制、动力学与任务级 KPI |
-| 场景化回归 | ✅ 核心可用 | YAML/JSON/内置场景，支持 seed 复现与 10-seed 批量 `run_benchmark.py` |
+| 场景化回归 | ✅ 核心可用 | YAML/JSON/内置场景，支持 seed 复现与 15-seed 批量 `run_benchmark.py` |
 | 2D BEV 演示 | ✅ 核心可用 | Matplotlib 实时渲染；无图形环境可 `--no_vis` |
 | 任务级评测 | ✅ 核心可用 | 任务成功、碰撞、净距、TTC、Jerk、横向误差、时延、驶出道路 |
 | 博弈/EM/MPC/Pacejka | 🧪 未来工作 | 代码保留、接口可切换，但不纳入主结果 |
@@ -60,11 +60,11 @@ pip install -r requirements.txt
 # 无图形环境运行核心场景
 python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
 
-# 低功耗核心基准（10 seeds；论文目标 30–50 seeds）
+# 低功耗核心基准（15 seeds；论文目标 30–50 seeds）
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
-  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 --duration 20
+  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 --duration 20
 ```
 
 ### 3.3 外部仿真器与中间件（路线图）

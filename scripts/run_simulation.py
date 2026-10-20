@@ -32,6 +32,11 @@ def main():
     parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"], help="规划器；em 为未来工作")
     parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"], help="控制器；mpc 为未来工作")
     parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"], help="轮胎模型；pacejka 为未来工作")
+    parser.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        help="允许运行 Game/EM/MPC/Pacejka/交叉口等实验性模块（结果不纳入主结果）",
+    )
     args = parser.parse_args()
 
     if args.scenario.endswith((".yaml", ".yml", ".json")):
@@ -61,6 +66,13 @@ def main():
         tire_model=args.tire,
     )
 
+    if engine.experimental:
+        reasons = ", ".join(engine.experimental_reasons)
+        print(f"[EXPERIMENTAL] 当前运行包含实验性模块：{reasons}")
+        print("[EXPERIMENTAL] 结果不纳入论文/答辩主结果；需显式加 --allow-experimental 才继续。")
+        if not args.allow_experimental:
+            return 2
+
     print(">>> 仿真运行中...")
     report = engine.run(max_duration=args.duration)
 
@@ -81,7 +93,8 @@ def main():
             json.dump(report, fh, ensure_ascii=False, indent=2)
         print(f">>> 逐帧数据: {telemetry_path}")
         print(f">>> KPI 报告: {report_path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

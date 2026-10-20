@@ -158,8 +158,27 @@ def build_engine(
     """按场景配置与算法选择装配闭环仿真引擎。"""
     vp = _vehicle_params(scenario)
     resolved_tire = str(tire_model or vp.get("tire_model", "linear")).lower()
+    resolved_decision = str(decision or "fsm").lower()
+    resolved_planner = str(
+        planner or (scenario.planning_params or {}).get("planner", "lattice")
+    ).lower()
+    resolved_controller = str(
+        controller or (scenario.control_params or {}).get("controller", "lqr")
+    ).lower()
     if resolved_tire == "pacejka":
         use_dynamic_model = True
+
+    experimental_reasons = []
+    if resolved_decision == "game":
+        experimental_reasons.append("game_decision")
+    if resolved_planner == "em":
+        experimental_reasons.append("em_planner")
+    if resolved_controller == "mpc":
+        experimental_reasons.append("mpc_controller")
+    if resolved_tire == "pacejka":
+        experimental_reasons.append("pacejka_tire")
+    if str(scenario.name).lower() == "intersection_unprotected":
+        experimental_reasons.append("intersection_unprotected")
 
     return SimulationEngine(
         road_network=scenario.road_network,
@@ -177,6 +196,8 @@ def build_engine(
         initial_lane_id=scenario.current_lane_id,
         tire_model=resolved_tire,
         scenario_name=scenario.name,
+        experimental=bool(experimental_reasons),
+        experimental_reasons=experimental_reasons,
     )
 
 

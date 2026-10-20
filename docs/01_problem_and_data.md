@@ -22,7 +22,7 @@
 
 | 数据集 | 来源与特征 | 计划用途 | 当前状态 |
 | :--- | :--- | :--- | :--- |
-| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为回放场景 | ✅ CSV 解析器已实现；未附带数据、未标定 |
+| **highD** | 德国高速公路无人机俯拍，定位误差小于 10 cm，包含自然超车、汇入与换道 | 标定 IDM 跟驰参数；选取汇入片段作为开环回放 | ⚠️ CSV 解析器 + 最小可信版标定/回放脚本已实现；真实数据未随附，未在本机运行真实标定 |
 | **INTERACTION** | 伯克利等联合发布，含环岛、无保护路口、匝道并线等强交互场景 | 博弈决策的对抗场景与评测基准 | 接口预留，未接入数据 |
 | **NGSIM** | 美国 FHWA 的 US-101 / I-80 高密度轨迹 | 大流量交通流重放与极限合流测试 | 接口预留，未接入数据 |
 
@@ -38,6 +38,16 @@ window = loader.extract_window(0.0, 10.0, ego_id=123, radius=80.0)
 ```
 
 > 解析器保留 highD 原始 x/y 坐标，不做重定心/旋转；`height` 视为车身长度。把 highD 轨迹接入 `RoadNetwork` 前仍需做坐标对齐与场景切片选择。
+
+最小可信版 CLI（真实数据放到 `data/raw/highD/` 后）：
+
+```bash
+python3 scripts/calibrate_highd.py --data-root data/raw/highD --recording 01
+python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
+  --start-time 0 --duration 10 --step 0.5 --max-frames 12 --gif
+```
+
+`data/sample_highd` 是合成样例，输出会标记 `synthetic_sample`，只能用于自检。详见 [10_highd_calibration_replay.md](10_highd_calibration_replay.md)。
 
 **当前实验数据来源**：
 1. `configs/scenarios/*.yaml` 中的典型场景（高速汇入 `highway_merge`、前方静止紧急避撞 `emergency_avoidance`、近距离激进切入 `cut_in`），用于覆盖 ODD 核心功能安全与控制边界验证；

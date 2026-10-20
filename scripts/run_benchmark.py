@@ -36,7 +36,26 @@ def main():
     parser.add_argument("--planner", type=str, default=None, choices=["lattice", "em"])
     parser.add_argument("--controller", type=str, default=None, choices=["lqr", "mpc"])
     parser.add_argument("--tire", type=str, default=None, choices=["linear", "pacejka"])
+    parser.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        help="允许 Game/EM/MPC/Pacejka/交叉口进入批量评测（结果标记为实验性）",
+    )
     args = parser.parse_args()
+
+    experimental = (
+        any(decision == "game" for decision in args.decisions)
+        or args.planner == "em"
+        or args.controller == "mpc"
+        or args.tire == "pacejka"
+        or any("intersection" in str(name) for name in args.scenarios)
+    )
+    if experimental and not args.allow_experimental:
+        print("[EXPERIMENTAL] 当前参数包含实验性模块（Game/EM/MPC/Pacejka/交叉口）。")
+        print("[EXPERIMENTAL] 这些模块代码保留，但不纳入主结果；请加 --allow-experimental 后显式运行。")
+        return 2
+    if experimental:
+        print("[EXPERIMENTAL] 已允许运行；输出会标记 experimental=true，请勿写入主结果表。")
 
     print(">>> 启动批量场景基准评测...")
     suite = BenchmarkSuite(
@@ -75,7 +94,8 @@ def main():
     print(f">>> JSON: {json_path}")
     print(f">>> CSV : {csv_path}")
     print(f">>> Group summary CSV: {summary_csv_path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

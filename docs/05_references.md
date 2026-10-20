@@ -16,13 +16,14 @@ intelligent-vehicle-simulation/
 ├── docs/                       # 大赛技术支撑材料
 │   ├── 01_problem_and_data.md  # 问题来源与数据来源说明
 │   ├── 02_digital_models.md    # 数字模型（核心/未来工作标注）
-│   ├── 03_results_and_demo.md  # 核心 10-seed 结果与分析
+│   ├── 03_results_and_demo.md  # 核心 15-seed 结果与分析
 │   ├── 04_application.md       # 应用与工程落地
 │   ├── 05_references.md        # 代码体系与参考文献
 │   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
 │   ├── 07_scope_and_future_work.md  # 范围与未来工作清单
 │   ├── 08_paper_draft.md        # 论文草稿（v0.4-core）
-│   └── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
+│   ├── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
+│   └── 10_highd_calibration_replay.md  # highD 最小可信版（标定/回放）
 ├── src/                        # 核心仿真引擎与算法接口
 │   ├── common/                 # 车辆状态、Frenet 映射、OBB 碰撞、QP 后端
 │   ├── environment/            # 道路网络、场景加载、IDM/MOBIL、highD 解析
@@ -38,8 +39,8 @@ intelligent-vehicle-simulation/
 │   ├── visualization/          # 2D BEV 与真实遥测图表
 │   ├── runner.py               # 场景 -> 决策/规划/控制/引擎装配工厂
 │   └── simulator.py            # 端到端闭环仿真主引擎
-├── scripts/                    # run_simulation / run_benchmark / export_results / export_core_figures
-└── tests/                      # 86 项单元/闭环测试（含任务成功判据）
+├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
+└── tests/                      # 96 项单元/闭环测试（含任务成功判据）
 ```
 
 ---
@@ -47,18 +48,18 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 低功耗测试（当前 86 项；含任务级闭环用例；约 10–20 s，视机器负载）
+# 低功耗测试（当前 96 项；含任务级闭环用例；约 10–20 s，视机器负载）
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B -m unittest discover tests -v
 
 # 核心场景闭环 + KPI
 python3 scripts/run_simulation.py --scenario highway_merge --decision fsm --duration 20 --no_vis
 
-# 核心基准（10 seeds；论文目标 30–50 seeds）
+# 核心基准（15 seeds；论文目标 30–50 seeds）
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B scripts/run_benchmark.py \
   --scenarios highway_merge cut_in emergency_avoidance \
-  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 --duration 20
+  --decisions fsm --seeds 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 --duration 20
 ```
 
 ---

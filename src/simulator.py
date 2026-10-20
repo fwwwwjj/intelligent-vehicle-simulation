@@ -11,7 +11,7 @@
 """
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -53,6 +53,8 @@ class SimulationEngine:
         plan_horizon: float = 5.0,
         tire_model: Optional[str] = None,
         scenario_name: Optional[str] = None,
+        experimental: bool = False,
+        experimental_reasons: Optional[List[str]] = None,
     ):
         self.road_network = road_network
         self.obstacle_manager = obstacle_manager
@@ -61,6 +63,9 @@ class SimulationEngine:
         self.controller = controller
         self.ego_state = ego_initial_state
         self.scenario_name = str(scenario_name or "").lower()
+        # 实验性模块（Game/EM/MPC/Pacejka/交叉口）保留代码，但默认不进入主结果。
+        self.experimental = bool(experimental)
+        self.experimental_reasons = list(experimental_reasons or [])
         self.tire_model = str(
             tire_model
             or (vehicle_params or {}).get("tire_model", "linear")
