@@ -78,6 +78,32 @@ class TrajectoryCostEvaluator:
         cost_lateral_accel = 0.0
         valid = True
 
+        if obstacles:
+            r_ego = 0.5 * float(np.hypot(self.ego_length, self.ego_width))
+            hl_ego = 0.5 * self.ego_length
+            hw_ego = 0.5 * self.ego_width
+            obs_info = []
+            for obs in obstacles:
+                r_obs = 0.5 * float(np.hypot(obs.length, obs.width))
+                r_reach = r_ego + r_obs
+                r_clearance = r_reach + 3.0
+                c_obs = float(np.cos(obs.heading))
+                s_obs = float(np.sin(obs.heading))
+                hl_obs = 0.5 * obs.length
+                hw_obs = 0.5 * obs.width
+                obs_info.append({
+                    "obs": obs,
+                    "r_reach": r_reach,
+                    "r_clearance_sq": r_clearance * r_clearance,
+                    "r_collision_sq": (r_reach + self.collision_buffer) ** 2,
+                    "c_obs": c_obs,
+                    "s_obs": s_obs,
+                    "hl_obs": hl_obs,
+                    "hw_obs": hw_obs,
+                    "hx_obs": hl_obs * abs(c_obs) + hw_obs * abs(s_obs),
+                    "hy_obs": hl_obs * abs(s_obs) + hw_obs * abs(c_obs),
+                })
+
         for pt in trajectory.points:
             # 动力学/运动学可行性
             if pt.v < -0.1 or pt.a > self.max_accel + 1e-6 or pt.a < -self.max_decel - 1e-6:
@@ -96,26 +122,44 @@ class TrajectoryCostEvaluator:
             if not obstacles:
                 continue
 
-            ego_box = BoundingBox2D(pt.x, pt.y, self.ego_length, self.ego_width, pt.theta)
-            for obs in obstacles:
+            c_pt = float(np.cos(pt.theta))
+            s_pt = float(np.sin(pt.theta))
+            hx_ego = hl_ego * abs(c_pt) + hw_ego * abs(s_pt)
+            hy_ego = hl_ego * abs(s_pt) + hw_ego * abs(c_pt)
+            ego_box = None
+
+            for info in obs_info:
+                obs = info["obs"]
                 # 恒定速度预测到轨迹点时刻
                 ox = obs.x + obs.vx * pt.t
                 oy = obs.y + obs.vy * pt.t
-                # 粗筛：中心距超过外接圆半径直接跳过，降低 SAT 调用量
-                if np.hypot(pt.x - ox, pt.y - oy) > 0.5 * (
-                    np.hypot(self.ego_length, self.ego_width)
-                    + np.hypot(obs.length, obs.width)
-                ) + 1.0:
+                dx = pt.x - ox
+                dy = pt.y - oy
+                dist_sq = dx * dx + dy * dy
+
+                # 粗筛 1：中心距平方超过 (r_ego + r_obs + 3.0)^2 时，最小净距必 >= 3.0，
+                # 碰撞不可能发生且 clearance 惩罚必为 0，直接跳过
+                if dist_sq >= info["r_clearance_sq"]:
                     continue
 
+                # 粗筛 2：AABB 轴对齐包围盒快速排斥
+                if abs(dx) >= hx_ego + info["hx_obs"] + 3.0 or abs(dy) >= hy_ego + info["hy_obs"] + 3.0:
+                    continue
+
+                if ego_box is None:
+                    ego_box = BoundingBox2D(pt.x, pt.y, self.ego_length, self.ego_width, pt.theta)
                 obs_box = BoundingBox2D(ox, oy, obs.length, obs.width, obs.heading)
-                if CollisionChecker.check_obb_collision(
-                    ego_box, obs_box, buffer=self.collision_buffer
-                ):
-                    cost_collision += self.w_collision
-                    valid = False
-                    continue
 
+                # 精筛 1：中心距进入潜在碰撞圆范围时才进行 SAT 碰撞检测
+                if dist_sq <= info["r_collision_sq"]:
+                    if CollisionChecker.check_obb_collision(
+                        ego_box, obs_box, buffer=self.collision_buffer
+                    ):
+                        cost_collision += self.w_collision
+                        valid = False
+                        continue
+
+                # 精筛 2：标量几何精确距离计算
                 distance = CollisionChecker.min_distance_between_boxes(ego_box, obs_box)
                 if distance < 3.0:
                     cost_clearance += self.w_clearance / max(0.2, distance) * dt

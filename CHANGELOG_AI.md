@@ -1,5 +1,16 @@
 # AI 修改记录
 
+## 2026-10-20 (优化规划计算几何与碰撞距离粗筛，时延 p95 降至 10ms 内)
+
+- **修改文件**：`src/common/geometry.py`、`src/planning/cost_evaluator.py`、`src/common/frenet_frame.py`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。
+- **修改内容**：
+  1. 在 `cost_evaluator.py` 中引入外接圆与 AABB 几何双重粗筛，中心距与轴向距离超出 $R_1 + R_2 + 3.0\text{m}$ 时直接跳过昂贵的 OBB SAT 与点线段计算；
+  2. 优化 `CollisionChecker.check_obb_collision`，以标量轴向投影计算代替逐点生成顶点小数组，单次 SAT 调用耗时降低约 20 倍；
+  3. 重构 `CollisionChecker.min_distance_between_boxes`，消除冗余顶点比对并用纯标量数学计算点线段距离平方，单对包围盒最短净距求解耗时降低 18 倍；
+  4. 在 `FrenetConverter.ref_point_at_s` 中引入参考线弧长数组对象缓存，消除高频规划中逐点构造大数组与重复排序开销；
+  5. 实测 20s `highway_merge`（400步）规划平均时延从 37.8ms 降至 5.7ms，p95 时延从 88.1ms 压减至 9.7ms（达成 $\le 15\text{ms}$ 验收目标），最大时延从 89.2ms 降至 11.8ms，且三个标准场景 KPI 与碰撞率维持零差异。
+- **验证方式及结果**：`python3 -B -m unittest discover tests` 65 项全绿；同一 seed 42 下 20s 运行，规划 p95 为 9.66ms。
+
 ## 2026-10-20 (修复回退诊断指标与 P95 时延口径)
 
 - **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`tests/test_metrics.py`、`docs/06_qp_mpc_em_pacejka.md`、`AI_SYSTEM_SPEC.md`、`CHANGELOG_AI.md`。

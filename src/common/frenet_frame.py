@@ -55,8 +55,25 @@ class FrenetConverter:
     严格推导非线性曲率与时空映射关系
     """
 
-    @staticmethod
-    def ref_point_at_s(reference_line: List[ReferencePoint], s_query: float) -> ReferencePoint:
+    _ref_line_cache: dict = {}
+
+    @classmethod
+    def _get_sorted_s_array(cls, reference_line: List[ReferencePoint]) -> np.ndarray:
+        ref_id = id(reference_line)
+        cached = cls._ref_line_cache.get(ref_id)
+        if cached is not None and cached[0] == len(reference_line):
+            return cached[1]
+        ss = np.array([p.s for p in reference_line], dtype=float)
+        if not np.all(np.diff(ss) >= -1e-9):
+            order = np.argsort(ss)
+            ss = ss[order]
+        if len(cls._ref_line_cache) > 64:
+            cls._ref_line_cache.clear()
+        cls._ref_line_cache[ref_id] = (len(reference_line), ss)
+        return ss
+
+    @classmethod
+    def ref_point_at_s(cls, reference_line: List[ReferencePoint], s_query: float) -> ReferencePoint:
         """
         按弧长 ``s_query`` 在参考线上做线性插值。
 
@@ -69,12 +86,7 @@ class FrenetConverter:
         if len(reference_line) == 1:
             return reference_line[0]
 
-        ss = np.array([p.s for p in reference_line], dtype=float)
-        if not np.all(np.diff(ss) >= -1e-9):
-            # 允许调用方传入未排序数据，但排序会破坏 s 的物理含义，这里只做稳定兜底
-            order = np.argsort(ss)
-            reference_line = [reference_line[i] for i in order]
-            ss = ss[order]
+        ss = cls._get_sorted_s_array(reference_line)
 
         s_query = float(np.clip(s_query, ss[0], ss[-1]))
         idx = int(np.searchsorted(ss, s_query))
