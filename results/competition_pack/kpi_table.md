@@ -14,6 +14,7 @@
 > - 30 seeds 是轻量基准；论文/答辩目标为每条件 30–50 seeds；
 > - `task_completion_time_s=999` 表示非离散任务（cut_in/emergency 用终态判据），不是 999 秒完成；
 > - 所有核心场景 `collision_frames=0`、`road_departure=0`；
+> - **cut-in 安全余量**：最小 TTC 约 1.75 s，低于 2.7 s 预警阈值，属于“紧安全余量但无碰撞”；最小净距 5.47 m、最大制动约 5.94 m/s²。详见 docs/03 §3.4。
 > - `planner_invalid_count` 均值：highway_merge 0.1、cut_in 11.2、emergency_avoidance 30.2；`safety_brake_count` 均为 0（invalid 主要来自远端碰撞/加速度越界，未触发急刹）；
 > - 旧版 `kpi_table.md` 与旧图已归档到 `results/archive/2026-10-20_pre_scope/`，不得再引用；
-> - 图表待用当前 HEAD 重新生成（当前环境未安装 matplotlib）。
+> - 图表已由 `scripts/export_core_figures.py` 生成；重新生成需安装 matplotlib。

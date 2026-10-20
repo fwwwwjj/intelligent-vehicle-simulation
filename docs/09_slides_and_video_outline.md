@@ -37,11 +37,12 @@
 
 1. 为什么不用 Game/EM/MPC？——复杂算法原型未通过任务级验证，放未来工作，避免“宽而虚”。
 2. 30 seeds 够吗？——30 是轻量基线，已达到论文下限；建议补到 50 seeds 并做配对检验。
-3. 为什么用运动学模型？——核心验证决策/规划/控制逻辑；2-DOF/Pacejka 是未来工作。
-4. 任务成功判据会不会太严？——三个场景的判据都对应明确任务；不完成就是失败，避免假成功。
-5. invalid 轨迹怎么处理？——记录 + 1 s 内即将碰撞才急刹；更完整的安全包络是未来工作。
-6. 结果可复现吗？——见 `results/benchmark.json.metadata.git_commit`（当前 `77da4ae`）、seed 42–71、命令与 JSON/CSV 都在仓库。
-7. 实验性模块会不会混进主结果？——不会：CLI 默认拒绝 Game/EM/MPC/Pacejka/交叉口，必须加 `--allow-experimental`，且 benchmark 会写 `experimental=true`。
+3. 任务成功判据会不会太严？——三个场景的判据都对应明确任务；不完成就是失败，避免假成功。
+4. invalid 轨迹怎么处理？——记录 + 1 s 内即将碰撞才急刹；更完整的安全包络是未来工作。
+5. 结果可复现吗？——见 `results/benchmark.json.metadata.git_commit`（当前 `77da4ae`）、seed 42–71、命令与 JSON/CSV 都在仓库。
+6. 实验性模块会不会混进主结果？——不会：CLI 默认拒绝 Game/EM/MPC/Pacejka/交叉口，必须加 `--allow-experimental`，且 benchmark 会写 `experimental=true`。
+7. cut-in 的 TTC 只有 1.75 s，安全吗？——这是刻意设计的激进切入，低于 2.7 s 预警阈值；最小净距 5.47 m、最大制动 5.94 m/s²、无碰撞。应表述为“紧安全余量但无碰撞”，不能写“安全余量充足”。
+8. 为什么用运动学模型？——核心验证决策/规划/控制逻辑与任务级 KPI；不含轮胎侧滑/载荷转移，不是高保真动力学，2-DOF + Pacejka 是未来工作。
 
 ---
 

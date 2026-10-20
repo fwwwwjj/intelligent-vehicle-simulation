@@ -1,5 +1,16 @@
 # AI 修改记录
 
+## 2026-10-20 (文档修正：README 目录/CI 徽标/运动学保真度/cut-in TTC)
+
+- **修改文件**：`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/08_paper_draft.md`、`docs/09_slides_and_video_outline.md`、`AI_SYSTEM_SPEC.md`、`results/competition_pack/kpi_table.md`、`CHANGELOG_AI.md`。
+- **修改内容**：
+  1. README 文件树补齐 `docs/08`、`docs/09`、`docs/10`，并同步 scripts 目录说明；
+  2. 移除静态 “tests 96 local” 徽标，保留 GitHub Actions CI 徽标，并注明“本地 96 项通过，CI 以 Actions 为准”；
+  3. 在 README/docs/02/docs/03/docs/08/AI_SPEC 中增加**运动学模型保真度声明**：不含轮胎侧滑、载荷转移、悬架/制动动力学与传感器/执行器硬件延迟，不是高保真车辆动力学/HIL；
+  4. 在 docs/03 §3.4 与 docs/08 §6.1 增加 **cut-in 最小 TTC ≈1.75 s 的专门解释**：属于刻意激进切入、紧安全余量但无碰撞；最小净距 5.47 m、最大制动 5.94 m/s²；不能写成“安全余量充足”；
+  5. README 核心结果表增加 TTC 备注；答辩 Q&A 增加对应问题。
+- **验证方式及结果**：`git diff --check` 通过；本次仅文档与 KPI 表修改，代码未变，96 项测试状态不变。
+
 ## 2026-10-20 (v0.4-core：范围收敛到 FSM + Lattice + LQR，复杂算法转为未来工作)
 
 - **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`src/evaluation/benchmark.py`、`src/environment/road_network.py`、`src/environment/scenario_loader.py`、`src/planning/frenet_lattice.py`、`src/runner.py`、`src/control/lqr_controller.py`、`src/control/mpc_controller.py`、`scripts/run_benchmark.py`、`scripts/export_core_figures.py`（新增）、`scripts/export_competition_assets.py`、`tests/test_task_success.py`（新增）、`tests/test_closed_loop.py`、`.github/workflows/ci.yml`（恢复）、`LICENSE`（新增）、`README.md`、`docs/02`、`docs/03`、`docs/04`、`docs/05`、`docs/06`、`docs/07`（新增）、`docs/08_paper_draft.md`（新增）、`AI_SYSTEM_SPEC.md`、`results/*`、`CHANGELOG_AI.md`。

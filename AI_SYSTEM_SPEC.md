@@ -292,6 +292,8 @@ sequenceDiagram
 | 参数标定工具链 | `src/environment/calibration.py` | IDM 跟驰参数辨识工具链（尚未用真实 highD 标定） |
 | 安全监督 | `src/simulator.py` | 记录 invalid 轨迹；1 s 内即将碰撞时进入最小风险制动，记录 `planner_invalid` / `safety_brake` |
 | 任务级 KPI | `src/simulator.py` / `src/evaluation/metrics.py` | 碰撞、净距、TTC、横向/航向误差、Jerk、时延、任务成功/完成时间/驶出道路/规划无效帧 |
+
+> **保真度声明**：核心只用运动学自行车模型，不含轮胎侧滑、载荷转移、悬架/制动动力学与传感器/执行器硬件延迟；横向加速度、舒适性与安全间距结论是模型级结论，不能外推为真实车辆极限。2-DOF + Pacejka 属于未来工作。
 | 批量评测 | `src/evaluation/benchmark.py` | 多 seed × 场景 × 算法；JSON 配置/逐次结果/分组汇总；CSV 明细与统计 |
 
 ### 2. 探索性 / 未来工作模块（不纳入主结果）

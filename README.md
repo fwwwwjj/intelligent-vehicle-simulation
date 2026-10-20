@@ -5,8 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![CI](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-96%20local-brightgreen.svg)]()
 
+> 本地测试：96 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
+>
 > 本项目为**中国仿真创新应用大赛**参赛项目。当前版本（v0.4-core）聚焦一条**可运行、可验证、可复现**的闭环主链：
 >
 > **IDM/脚本化交通环境 → 分层有限状态机（HFSM）→ Frenet Lattice 轨迹规划 → LQR 横向/纵向控制 → 运动学车辆模型 → 任务级 KPI**，并在规划轨迹 invalid 时进入最小风险制动。
@@ -85,7 +86,10 @@ intelligent-vehicle-simulation/
 │   ├── 04_application.md       # 应用与工程落地
 │   ├── 05_references.md        # 代码体系与参考文献
 │   ├── 06_qp_mpc_em_pacejka.md # 未来工作技术储备
-│   └── 07_scope_and_future_work.md  # 当前范围与未来工作清单
+│   ├── 07_scope_and_future_work.md  # 当前范围与未来工作清单
+│   ├── 08_paper_draft.md       # 论文草稿（v0.4-core）
+│   ├── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
+│   └── 10_highd_calibration_replay.md  # highD 最小可信版
 ├── src/
 │   ├── common/                 # 状态、Frenet、OBB-SAT、QP 后端
 │   ├── environment/            # 路网、场景加载、IDM/MOBIL、highD 解析、标定
@@ -97,7 +101,7 @@ intelligent-vehicle-simulation/
 │   ├── visualization/          # 2D BEV、科研图表
 │   ├── runner.py               # 场景 → 算法装配工厂
 │   └── simulator.py            # 闭环仿真主引擎
-├── scripts/                    # run_simulation / run_benchmark / export_results
+├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
 ├── tests/                      # 96 项单元/闭环测试
 └── results/                    # 30-seed 核心基准 JSON/CSV、归档
 ```
@@ -238,11 +242,15 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 | `emergency_avoidance` | 1.000 [0.886, 1.000] | 14.11 ± 0.13 | 2.37 ± 0.00 | 1.803 ± 0.002 | 0.000 ± 0.000 | 1.56 / 1.89 |
 
 > 任务成功率 = 完成任务 + 无碰撞 + 不驶出道路，不是“未碰撞”。详细定义、逐 seed 结果与复现命令见 [docs/03_results_and_demo.md](docs/03_results_and_demo.md) 和 `results/`。
+>
+> **关于 cut-in 的 TTC：** 最小 TTC 约 **1.75 s**，低于常用的 2.7 s 预警阈值，说明该脚本化切入是**紧安全余量**工况；其最小净距约 5.47 m、最大制动约 5.94 m/s²、无碰撞。详细解释见 docs/03 §3.3，不能把它写成“安全余量充足”。
 > 图表见 `results/competition_pack/figures/`；论文草稿见 [docs/08_paper_draft.md](docs/08_paper_draft.md)；答辩/视频大纲见 [docs/09_slides_and_video_outline.md](docs/09_slides_and_video_outline.md)。
 
 ---
 
 ## 七、 当前实现边界
+
+**仿真保真度（重要）：** 核心使用**运动学自行车模型**，不含轮胎侧滑、载荷转移、悬架/制动动力学，也没有传感器/执行器硬件延迟。因此它是“决策—规划—控制逻辑 + 任务级 KPI”的仿真基线，**不是高保真车辆动力学仿真，也不是 HIL**。本文的横向加速度、舒适性和安全间距结论都是模型级结论，不能外推为真实车辆极限；2-DOF + Pacejka 属于未来工作。
 
 **已进入核心闭环：**
 
