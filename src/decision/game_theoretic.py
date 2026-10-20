@@ -2,13 +2,13 @@
 基于博弈论的交互式动态行为决策接口 (Game-Theoretic Interactive Decision Maker)。
 针对强交互场景（匝道汇入、交叉口），构建主车与关键交互车辆的非合作博弈收益矩阵。
 
-当前实现采用可解释的二人非零和收益矩阵：
-主车策略 {merge/pass, yield} × 背景车策略 {pass, yield}，
-对每个组合计算安全、效率、舒适三项效用，再取最坏情况（min）作为稳健收益，
-避免“只看自己收益、忽略对方反应”的伪博弈。
+支持：
+1. 对手意图在线估计 (Opponent Intent Inference / Bayesian Belief Update)；
+2. 连续动作空间多候选策略收益评估（加速冲前间隙、平稳协同切入、主动减速礼让后插）；
+3. 贝叶斯期望效用最大化 (Bayesian Expected Utility Maximization)。
 """
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING
 import numpy as np
 
 from src.common.state import VehicleState, ObstacleState
@@ -20,9 +20,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class GameTheoreticDecisionMaker(BaseDecisionMaker):
     """
-    博弈交互决策器
-    通过评估 (加速汇入, 减速礼让) x (背景车加速通过, 背景车礼让) 的收益矩阵，
-    选择稳健收益更高的战术意图。
+    贝叶斯动态博弈交互决策器。
+    通过动态更新背景车礼让置信度 P(yield)，评估不同速度协同策略的贝叶斯期望收益，
+    在确保安全硬约束的前提下，实现平滑高效的协同合流与跟驰。
     """
 
     def __init__(
@@ -43,45 +43,120 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
         self.ego_length = float(ego_length)
         self.ego_width = float(ego_width)
 
+        # 动态意图信念跟踪：obs_id -> P(yield)
+        self._yield_beliefs: dict[str, float] = {}
+        self._last_obs_states: dict[str, Tuple[float, float]] = {}  # obs_id -> (vx, timestamp)
+
     # ------------------------------------------------------------------
-    # 收益函数
+    # 对手意图在线贝叶斯推断
+    # ------------------------------------------------------------------
+    def estimate_opponent_intent(self, obs: ObstacleState) -> float:
+        """
+        根据背景车历史时序加速度与微观运动趋势，递推估计其礼让概率 P(yield)。
+        :param obs: 交互背景车辆状态
+        :return: 估计出的礼让概率，范围 [0.05, 0.95]
+        """
+        prior = self._yield_beliefs.get(obs.id, 0.5)
+
+        # 基于前后速度差分近似估计其当前加速度
+        last_info = self._last_obs_states.get(obs.id)
+        current_time = getattr(obs, "timestamp", 0.0)
+        self._last_obs_states[obs.id] = (obs.vx, current_time)
+
+        if last_info is None:
+            return prior
+
+        last_vx, last_time = last_info
+        dt_span = max(1e-3, current_time - last_time) if current_time > last_time else 0.05
+        delta_v = obs.vx - last_vx
+        approx_accel = delta_v / dt_span
+
+        # 若背景车有减速迹象 (accel < -0.3 m/s^2)，说明其展现礼让倾向
+        if approx_accel < -0.3:
+            likelihood_yield = 0.85
+        elif approx_accel > 0.3:
+            # 持续加速冲抢，判定为不礼让 (pass)
+            likelihood_yield = 0.15
+        else:
+            likelihood_yield = 0.50
+
+        # 贝叶斯时序递推融合
+        posterior = 0.65 * prior + 0.35 * likelihood_yield
+        posterior = float(np.clip(posterior, 0.05, 0.95))
+        self._yield_beliefs[obs.id] = posterior
+        return posterior
+
+    # ------------------------------------------------------------------
+    # 细化多目标综合效用函数
     # ------------------------------------------------------------------
     def calculate_payoff(
         self,
         ego_action: str,
         obs_action: str,
-        distance: float,
-        delta_v: float,
+        lead_gap: float,
+        follower_gap: float,
+        delta_v_lead: float,
+        delta_v_foll: float,
+        accel_effort: float = 0.0,
     ) -> float:
         """
-        计算主车在策略组合下的综合效用。
+        计算主车在特定联合动作 (ego_action x obs_action) 下的综合多目标效用。
 
-        :param ego_action: 'merge'（加速汇入）或 'yield'（减速礼让）
-        :param obs_action: 'pass'（背景车保持/加速）或 'yield'（背景车礼让）
-        :param distance: 与交互车的净纵向距离 (m)
-        :param delta_v: 主车相对交互车的速度差 (m/s)
+        :param ego_action: 'accel_merge', 'coop_merge', 'decel_yield'
+        :param obs_action: 'pass' (背景车强行通过) 或 'yield' (背景车减速礼让)
+        :param lead_gap: 目标车道前导车净距 (m)
+        :param follower_gap: 目标车道后随车净距 (m)
+        :param delta_v_lead: 主车相对于前车的速度差 (v_ego - v_lead)
+        :param delta_v_foll: 后随车相对于主车的接近速度 (v_foll - v_ego)
+        :param accel_effort: 动作所要求的控制加速度幅度 (m/s^2)
         :return: 效用评分
         """
-        # 安全项：汇入且对方不礼让，且距离/相对速度危险
-        if ego_action == "merge" and obs_action == "pass" and distance < 15.0 and delta_v > -1.0:
-            safety = -100.0
-        elif distance < 8.0:
-            safety = -40.0
+        # 1. 安全效用 (Safety Utility)
+        if ego_action.endswith("merge"):
+            # 与前导车的碰撞风险
+            risk_lead = max(0.0, 15.0 - lead_gap) * max(0.0, delta_v_lead) * 0.2
+            if lead_gap < 5.0:
+                risk_lead += 60.0
+
+            # 与后随车的碰撞风险
+            if obs_action == "pass":
+                # 对方不礼让：若后车正在快速逼近且距离近，施加连续二次惩罚
+                if delta_v_foll > 0.0:
+                    risk_foll = max(0.0, 20.0 - follower_gap) * delta_v_foll * 0.4
+                else:
+                    risk_foll = max(0.0, 8.0 - follower_gap) * 0.5
+                if follower_gap < 5.0:
+                    risk_foll += 80.0
+            else:
+                # 对方礼让：后车主动拉大车距，后向风险大幅降低
+                risk_foll = max(0.0, 6.0 - follower_gap) * 0.3
+
+            safety_score = 10.0 - (risk_lead + risk_foll)
         else:
-            safety = 10.0
+            # decel_yield: 主车在原车道减速，与目标车道车辆冲突基本消除
+            safety_score = 10.0
 
-        # 效率项：汇入通行收益更高
-        efficiency = 20.0 if ego_action == "merge" else 5.0
+        # 2. 通行效率效用 (Efficiency Utility)
+        if ego_action == "accel_merge":
+            efficiency_score = 25.0
+        elif ego_action == "coop_merge":
+            efficiency_score = 20.0
+        else:
+            # decel_yield 需等待下一间隙，效率打折
+            efficiency_score = 8.0
 
-        # 舒适项：减速礼让更平顺
-        comfort = 8.0 if ego_action == "merge" else 10.0
+        # 3. 乘坐舒适度效用 (Comfort Utility)
+        # 加速度调整幅度越大，舒适性打折越重
+        comfort_score = 10.0 - 1.5 * accel_effort
 
-        # 距离越近、相对速度越大，安全项惩罚越强
-        risk = max(0.0, (20.0 - distance)) * max(0.0, delta_v) * 0.1
-        return self.w_s * (safety - risk) + self.w_e * efficiency + self.w_c * comfort
+        return (
+            self.w_s * safety_score
+            + self.w_e * efficiency_score
+            + self.w_c * comfort_score
+        )
 
     # ------------------------------------------------------------------
-    # 场景查询
+    # 场景拓扑查询
     # ------------------------------------------------------------------
     def _lane_center_y(self, lane_id: str) -> Optional[float]:
         if self.road_network is None:
@@ -93,7 +168,7 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
 
     def _find_lead(
         self, ego_state: VehicleState, obstacles: List[ObstacleState], lane_id: str
-    ) -> tuple[Optional[ObstacleState], float]:
+    ) -> Tuple[Optional[ObstacleState], float]:
         center_y = self._lane_center_y(lane_id)
         lead = None
         min_gap = float("inf")
@@ -112,7 +187,7 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
 
     def _find_follower(
         self, ego_state: VehicleState, obstacles: List[ObstacleState], lane_id: str
-    ) -> tuple[Optional[ObstacleState], float]:
+    ) -> Tuple[Optional[ObstacleState], float]:
         center_y = self._lane_center_y(lane_id)
         follower = None
         min_gap = float("inf")
@@ -146,12 +221,17 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
         obstacles: List[ObstacleState],
         current_lane_id: str
     ) -> DecisionOutput:
-        """构建收益矩阵并选择稳健最优意图。"""
+        """
+        动态博弈决策主流程：
+        针对巡航、直行跟驰或匝道汇入，自适应选取纳什均衡策略与最优速度指令。
+        """
         current_lead, current_gap = self._find_lead(ego_state, obstacles, current_lane_id)
         target_lane = self._target_lane(current_lane_id)
 
+        # --------------------------------------------------------------
+        # 1. 非汇入/常规直行场景：自适应纵向巡航与安全跟驰
+        # --------------------------------------------------------------
         if target_lane is None:
-            # 非汇入场景：用 IDM 期望车距 + TTC 决定巡航或礼让
             if current_lead is not None and current_lead.vx < 1.0 and current_gap < 25.0:
                 return DecisionOutput(
                     intent=DrivingIntent.YIELD,
@@ -180,95 +260,94 @@ class GameTheoreticDecisionMaker(BaseDecisionMaker):
                 intent=DrivingIntent.CRUISE,
                 target_lane_id=current_lane_id,
                 target_speed=self.desired_speed,
-                reasoning_log="No interaction partner; cruise",
+                reasoning_log="Free flow cruise",
             )
 
+        # --------------------------------------------------------------
+        # 2. 强交互汇入场景：连续动作空间速度协同博弈
+        # --------------------------------------------------------------
         target_lead, target_lead_gap = self._find_lead(ego_state, obstacles, target_lane)
         target_follower, follower_gap = self._find_follower(ego_state, obstacles, target_lane)
 
-        # 1. 目标车道前导车交互收益
-        dist_lead = target_lead_gap if target_lead is not None else 100.0
-        rel_v_lead = ego_state.velocity - (target_lead.vx if target_lead is not None else ego_state.velocity)
-        if target_lead is not None and target_lead_gap < 12.0:
-            u_lead_merge = -50.0  # 距离前车过近，切入存在碰撞风险
+        # 在线估计后随车的礼让概率 P(yield)
+        p_yield = self.estimate_opponent_intent(target_follower) if target_follower else 0.5
+        p_pass = 1.0 - p_yield
+
+        # 零碰撞绝对底线约束（物理净距小于 5.0m 或小于 12.0m 且后车在快速逼近时强制禁止变道）
+        critical_rear_danger = (
+            target_follower is not None
+            and (follower_gap < 5.0 or (follower_gap < 12.0 and (target_follower.vx - ego_state.velocity) > 0.5))
+        )
+        critical_lead_danger = target_lead is not None and target_lead_gap < 8.0
+        critical_danger = critical_rear_danger or critical_lead_danger
+
+        lead_gap_eval = target_lead_gap if target_lead is not None else 100.0
+        follow_gap_eval = follower_gap if target_follower is not None else 100.0
+
+        # 策略 1: ACCEL_MERGE (主动加速冲前间隙汇入)
+        lead_v = target_lead.vx if target_lead is not None else self.desired_speed
+        target_v_accel = min(self.desired_speed, max(ego_state.velocity + 1.8, lead_v + 1.5))
+        effort_accel = max(0.0, target_v_accel - ego_state.velocity)
+        delta_v_lead_1 = target_v_accel - lead_v
+        delta_v_foll_1 = (target_follower.vx - target_v_accel) if target_follower else 0.0
+
+        u_accel_yield = self.calculate_payoff("accel_merge", "yield", lead_gap_eval, follow_gap_eval, delta_v_lead_1, delta_v_foll_1, effort_accel)
+        u_accel_pass = self.calculate_payoff("accel_merge", "pass", lead_gap_eval, follow_gap_eval, delta_v_lead_1, delta_v_foll_1, effort_accel)
+        e_u_accel = p_yield * u_accel_yield + p_pass * u_accel_pass
+
+        # 策略 2: COOP_MERGE (协同匀速平稳汇入)
+        target_v_coop = min(self.desired_speed, max(lead_v, 8.0))
+        effort_coop = abs(target_v_coop - ego_state.velocity)
+        delta_v_lead_2 = target_v_coop - lead_v
+        delta_v_foll_2 = (target_follower.vx - target_v_coop) if target_follower else 0.0
+
+        u_coop_yield = self.calculate_payoff("coop_merge", "yield", lead_gap_eval, follow_gap_eval, delta_v_lead_2, delta_v_foll_2, effort_coop)
+        u_coop_pass = self.calculate_payoff("coop_merge", "pass", lead_gap_eval, follow_gap_eval, delta_v_lead_2, delta_v_foll_2, effort_coop)
+        e_u_coop = p_yield * u_coop_yield + p_pass * u_coop_pass
+
+        # 策略 3: DECEL_YIELD (主动减速后插礼让)
+        foll_v = target_follower.vx if target_follower is not None else self.desired_speed
+        target_v_yield = max(5.0, min(self.desired_speed, foll_v - 2.0))
+        if current_lead is not None:
+            target_v_yield = min(target_v_yield, current_lead.vx)
+        effort_yield = max(0.0, ego_state.velocity - target_v_yield)
+
+        u_yield_yield = self.calculate_payoff("decel_yield", "yield", lead_gap_eval, follow_gap_eval, 0.0, 0.0, effort_yield)
+        u_yield_pass = self.calculate_payoff("decel_yield", "pass", lead_gap_eval, follow_gap_eval, 0.0, 0.0, effort_yield)
+        e_u_yield = p_yield * u_yield_yield + p_pass * u_yield_pass
+
+        # 贝叶斯期望效用最大化决策选择
+        if critical_danger:
+            selected_action = "decel_yield"
+            selected_speed = target_v_yield
+            best_payoff = e_u_yield
         else:
-            u_lead_merge = min(
-                self.calculate_payoff("merge", "pass", dist_lead, rel_v_lead),
-                self.calculate_payoff("merge", "yield", dist_lead, rel_v_lead),
-            )
-        u_lead_yield = min(
-            self.calculate_payoff("yield", "pass", dist_lead, rel_v_lead),
-            self.calculate_payoff("yield", "yield", dist_lead, rel_v_lead),
-        )
+            candidates = [
+                ("accel_merge", e_u_accel, target_v_accel),
+                ("coop_merge", e_u_coop, target_v_coop),
+                ("decel_yield", e_u_yield, target_v_yield),
+            ]
+            selected_action, best_payoff, selected_speed = max(candidates, key=lambda item: item[1])
 
-        # 2. 目标车道后随车博弈收益
-        follower_closing = (
-            target_follower.vx - ego_state.velocity if target_follower is not None else 0.0
-        )
-        if target_follower is not None:
-            risk_foll = max(0.0, 18.0 - follower_gap) * max(0.0, follower_closing) * 0.25
-            # 主车汇入：若后车不礼让 (pass) 且正高速逼近，产生极高安全惩罚
-            u_foll_merge_pass = (
-                self.w_s * (10.0 - (100.0 if (follower_gap < 15.0 and follower_closing > 0.5) else risk_foll))
-                + self.w_e * 20.0
-                + self.w_c * 8.0
-            )
-            # 主车汇入：若后车减速礼让 (yield)，通行顺畅
-            u_foll_merge_yield = self.w_s * 10.0 + self.w_e * 20.0 + self.w_c * 8.0
-            u_foll_merge = min(u_foll_merge_pass, u_foll_merge_yield)
-
-            # 主车礼让等待：后车通过，主车安全有保障
-            u_foll_yield_pass = self.w_s * 10.0 + self.w_e * 8.0 + self.w_c * 10.0
-            u_foll_yield_yield = self.w_s * 10.0 + self.w_e * 6.0 + self.w_c * 10.0
-            u_foll_yield = min(u_foll_yield_pass, u_foll_yield_yield)
-
-            u_merge = min(u_lead_merge, u_foll_merge)
-            u_yield = min(u_lead_yield, u_foll_yield)
-        else:
-            u_merge = u_lead_merge
-            u_yield = u_lead_yield
-
-        # 硬安全约束防线
-        rear_hard_unsafe = target_follower is not None and (
-            follower_gap < 5.0 or (follower_gap < 12.0 and follower_closing > 1.0)
-        )
-        lead_hard_unsafe = target_lead is not None and target_lead_gap < 10.0
-        can_merge = (u_merge > u_yield) and not rear_hard_unsafe and not lead_hard_unsafe
-
-        if can_merge:
-            target_speed = self.desired_speed
-            if target_lead is not None:
-                target_speed = min(self.desired_speed, max(target_lead.vx, 5.0) + 2.0)
+        if selected_action.endswith("merge"):
             return DecisionOutput(
                 intent=DrivingIntent.MERGE,
                 target_lane_id=target_lane,
-                target_speed=target_speed,
+                target_speed=selected_speed,
                 lead_obstacle_id=target_lead.id if target_lead else None,
                 reasoning_log=(
-                    f"Nash choice=merge (u_merge={u_merge:.1f} > u_yield={u_yield:.1f}); "
-                    f"lead_gap={target_lead_gap:.1f}m, follower_gap={follower_gap:.1f}m"
+                    f"Bayesian Game: {selected_action.upper()} (E[U]={best_payoff:.1f}); "
+                    f"P(yield)={p_yield:.2f}; lead_gap={lead_gap_eval:.1f}m, follow_gap={follow_gap_eval:.1f}m"
                 ),
             )
-
-        # 战术礼让：主动调节车速，创造安全汇入窗口
-        if target_follower is not None and follower_closing > -1.0:
-            yield_speed = max(14.0, min(ego_state.velocity, target_follower.vx - 3.0))
-        elif target_lead is not None and target_lead_gap < 15.0:
-            yield_speed = min(self.desired_speed, max(12.0, target_lead.vx))
         else:
-            yield_speed = self.desired_speed
-        if current_lead is not None:
-            yield_speed = min(yield_speed, current_lead.vx)
-
-        reason = (
-            "rear unsafe"
-            if rear_hard_unsafe
-            else ("lead unsafe" if lead_hard_unsafe else f"u_yield={u_yield:.1f} >= u_merge={u_merge:.1f}")
-        )
-        return DecisionOutput(
-            intent=DrivingIntent.YIELD,
-            target_lane_id=current_lane_id,
-            target_speed=yield_speed,
-            lead_obstacle_id=current_lead.id if current_lead else None,
-            reasoning_log=f"Nash choice=yield ({reason}, yield_v={yield_speed:.1f})",
-        )
+            return DecisionOutput(
+                intent=DrivingIntent.YIELD,
+                target_lane_id=current_lane_id,
+                target_speed=selected_speed,
+                lead_obstacle_id=current_lead.id if current_lead else None,
+                reasoning_log=(
+                    f"Bayesian Game: DECEL_YIELD (critical_rear={critical_rear_danger}); "
+                    f"P(yield)={p_yield:.2f}; E[U_yield]={e_u_yield:.1f} vs E[U_merge]={max(e_u_accel, e_u_coop):.1f}"
+                ),
+            )

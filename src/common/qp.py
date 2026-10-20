@@ -39,6 +39,8 @@ class QPSolution:
     objective: float
     constraint_violation: float
     status: str = "solved"
+    z: Optional[np.ndarray] = None
+    y: Optional[np.ndarray] = None
 
 
 def _broadcast_bound(value, size: int, default: float) -> np.ndarray:
@@ -75,6 +77,8 @@ def solve_qp(
     adaptive_rho: bool = True,
     check_interval: int = 25,
     alpha: float = 1.6,
+    x_init: Optional[np.ndarray] = None,
+    y_init: Optional[np.ndarray] = None,
 ) -> QPSolution:
     """
     求解稠密凸 QP。
@@ -97,8 +101,14 @@ def solve_qp(
     :param adaptive_rho: 是否按原始/对偶残差比例自适应调整 rho
     :param check_interval: 自适应 rho 的检查间隔
     :param alpha: ADMM 过松弛系数，1.0 表示不松弛，1.6 为 OSQP 默认值
+    :param x_init: 原始变量初值别名 (等效于 x0)
+    :param y_init: 对偶变量初值别名 (等效于 y0)
     :return: :class:`QPSolution`
     """
+    if x0 is None and x_init is not None:
+        x0 = x_init
+    if y0 is None and y_init is not None:
+        y0 = y_init
     q = np.asarray(q, dtype=float).reshape(-1)
     n = q.size
     if n == 0:
@@ -259,6 +269,8 @@ def solve_qp(
         objective=_objective(P, q, x),
         constraint_violation=violation,
         status=status,
+        z=z.copy() if z is not None else None,
+        y=y.copy() if y is not None else None,
     )
 
 

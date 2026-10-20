@@ -75,9 +75,9 @@ class ObstacleState:
     obstacle_type: ObstacleType        # 类别
     x: float                           # 质心 X (m)
     y: float                           # 质心 Y (m)
-    length: float                      # 几何长度 (m)
-    width: float                       # 几何宽度 (m)
-    heading: float                     # 航向角 (rad)
+    length: float = 4.8                # 几何长度 (m)
+    width: float = 1.9                 # 几何宽度 (m)
+    heading: float = 0.0               # 航向角 (rad)
     vx: float = 0.0                    # 速度 X 分量 (m/s)
     vy: float = 0.0                    # 速度 Y 分量 (m/s)
     predicted_trajectory: Optional[List[TrajectoryPoint]] = None # 未来时域预测轨迹

@@ -44,10 +44,11 @@ def main():
     speeds = [r.velocity for r in records]
     lateral_errors = [r.lateral_error for r in records]
     jerks = [r.jerk for r in records]
+    ttcs = [r.min_ttc for r in records]
 
     output_path = out_dir / "telemetry_analysis.png"
     ScientificPlotter.plot_telemetry_curves(
-        times, speeds, lateral_errors, jerks, str(output_path)
+        times, speeds, lateral_errors, jerks, str(output_path), ttcs=ttcs
     )
     with (out_dir / "telemetry_analysis.json").open("w", encoding="utf-8") as fh:
         json.dump(

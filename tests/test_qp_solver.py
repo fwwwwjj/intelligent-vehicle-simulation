@@ -54,6 +54,29 @@ class TestQPSolver(unittest.TestCase):
         )
         np.testing.assert_allclose(warm.x, cold.x, atol=1e-3)
 
+    def test_warm_start_with_x_init_and_y_init_reduces_iterations(self):
+        # 构造稍具维度的 QP 命题测试热启动迭代加速
+        n = 6
+        np.random.seed(42)
+        M = np.random.randn(n, n)
+        P = np.dot(M.T, M) + 0.1 * np.eye(n)
+        q = np.random.randn(n)
+        A = np.random.randn(4, n)
+        l = -np.ones(4)
+        u = np.ones(4)
+        cold = solve_qp(P, q, A=A, l=l, u=u, max_iter=200)
+        self.assertTrue(cold.success)
+        self.assertIsNotNone(cold.y)
+
+        # 使用 x_init 与 y_init 热启动
+        warm = solve_qp(
+            P, q, A=A, l=l, u=u, x_init=cold.x, y_init=cold.y, max_iter=200
+        )
+        self.assertTrue(warm.success)
+        np.testing.assert_allclose(warm.x, cold.x, atol=1e-4)
+        # 热启动下迭代步数应明显少于冷启动
+        self.assertLessEqual(warm.iterations, cold.iterations)
+
     def test_inconsistent_bounds_raise(self):
         with self.assertRaises(ValueError):
             solve_qp(

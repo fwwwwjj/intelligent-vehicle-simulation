@@ -113,6 +113,8 @@ class MPCController(BaseController):
         qp_max_iter: int = 2500,
         qp_eps_abs: float = 2e-5,
         qp_eps_rel: float = 2e-5,
+        friction_coefficient: float = 0.9,
+        max_lateral_accel: float = 4.0,
     ):
         self.Np = max(1, int(prediction_horizon))
         self.Nc = max(1, min(int(control_horizon), self.Np))
@@ -140,6 +142,8 @@ class MPCController(BaseController):
         self.max_accel = float(max_accel)
         self.max_decel = float(max_decel)
         self.max_jerk = float(max_jerk)
+        self.friction_coefficient = float(friction_coefficient)
+        self.max_lateral_accel = float(max_lateral_accel)
 
         self.qp_max_iter = int(qp_max_iter)
         self.qp_eps_abs = float(qp_eps_abs)
@@ -149,6 +153,8 @@ class MPCController(BaseController):
         self._prev_steer = 0.0
         self.last_solve_info: Dict[str, Any] = {}
         self._warm_start_u: Optional[np.ndarray] = None
+        self._warm_start_x: Optional[np.ndarray] = None
+        self._warm_start_y: Optional[np.ndarray] = None
 
     # ------------------------------------------------------------------
     # 参考轨迹与当前误差
@@ -394,9 +400,38 @@ class MPCController(BaseController):
         )
 
         n_u = 2 * self.Nc
+        n_slack = self.Np
+        n_var = n_u + n_slack
+
         x0_qp = None
-        if self._warm_start_u is not None and self._warm_start_u.size == n_u:
+        y0_qp = None
+
+        if self._warm_start_x is not None and self._warm_start_x.size == n_var:
+            # 滚动时域热启动预测序列向前平移 1 步 (Receding-Horizon Warm-Start Shift)
+            prev_a = self._warm_start_x[: self.Nc]
+            shifted_a = np.empty_like(prev_a)
+            shifted_a[:-1] = prev_a[1:]
+            shifted_a[-1] = prev_a[-1]
+
+            prev_delta = self._warm_start_x[self.Nc : n_u]
+            shifted_delta = np.empty_like(prev_delta)
+            shifted_delta[:-1] = prev_delta[1:]
+            shifted_delta[-1] = prev_delta[-1]
+
+            prev_s = self._warm_start_x[n_u:]
+            shifted_s = np.empty_like(prev_s)
+            shifted_s[:-1] = prev_s[1:]
+            shifted_s[-1] = 0.0
+
+            x0_qp = np.concatenate([shifted_a, shifted_delta, shifted_s])
+        elif self._warm_start_u is not None and self._warm_start_u.size == n_u:
             x0_qp = np.concatenate([self._warm_start_u, np.zeros(self.Np)])
+
+        # 对偶变量热启动匹配：若上一周期的对偶变量维度与本周期一致，直接用于 ADMM 初值
+        m_ineq = A_ineq.shape[0] if A_ineq is not None else 0
+        m_total = m_ineq + n_var
+        if self._warm_start_y is not None and self._warm_start_y.size == m_total:
+            y0_qp = self._warm_start_y.copy()
 
         solution: QPSolution = solve_qp(
             P,
@@ -405,7 +440,8 @@ class MPCController(BaseController):
             u=b_ineq if A_ineq is not None else None,
             lb=lb,
             ub=ub,
-            x0=x0_qp,
+            x_init=x0_qp,
+            y_init=y0_qp,
             max_iter=self.qp_max_iter,
             eps_abs=self.qp_eps_abs,
             eps_rel=self.qp_eps_rel,
@@ -421,11 +457,15 @@ class MPCController(BaseController):
             accel_cmd = float(u_seq[0])
             steer_cmd = float(u_seq[self.Nc])
             self._warm_start_u = u_seq
+            self._warm_start_x = solution.x.copy()
+            self._warm_start_y = solution.y.copy() if solution.y is not None else None
         else:
             accel_cmd, steer_cmd = self._fallback_control(
                 current_state, ref0, ey, epsi, ev
             )
             self._warm_start_u = None
+            self._warm_start_x = None
+            self._warm_start_y = None
 
         # 执行机构硬约束 + 指令速率限制（即使 QP 失败也保证安全）
         max_delta_a = max(self.max_jerk, 0.0) * self._active_dt
@@ -438,7 +478,31 @@ class MPCController(BaseController):
         )
         accel_cmd = float(np.clip(accel_cmd, -self.max_decel, self.max_accel))
 
-        max_delta_steer = max(self.max_steer_rate, 0.0) * self._active_dt
+        # 轮胎侧向附着裕度监测与转向速率软保护
+        vx_now = max(1.0, float(current_state.vx if abs(current_state.vx) > 1e-6 else current_state.velocity))
+        curr_ay = float(current_state.ay if hasattr(current_state, "ay") else 0.0)
+        kinematic_ay = float(current_state.yaw_rate * vx_now)
+        a_lat_est = max(abs(curr_ay), abs(kinematic_ay))
+
+        g = 9.81
+        mu_g = max(0.1, self.friction_coefficient * g)
+        adhesion_ratio = a_lat_est / mu_g
+
+        # 当侧向附着利用率接近极限时平滑限幅转向速率，避免剧烈打方向导致侧滑失稳
+        if adhesion_ratio > 0.65:
+            rate_scale = float(np.clip(1.0 - 1.8 * (adhesion_ratio - 0.65), 0.20, 1.0))
+        else:
+            rate_scale = 1.0
+
+        max_delta_steer = max(self.max_steer_rate, 0.0) * self._active_dt * rate_scale
+
+        if self.max_lateral_accel is not None and self.max_lateral_accel > 0.0:
+            safe_a_lat_max = min(self.max_lateral_accel, mu_g * 0.9)
+            adhesion_steer_limit = float(np.arctan(self.wheelbase * safe_a_lat_max / (vx_now ** 2)))
+            effective_max_steer = min(self.max_steer, max(adhesion_steer_limit, 0.05))
+        else:
+            effective_max_steer = self.max_steer
+
         steer_cmd = float(
             np.clip(
                 steer_cmd,
@@ -446,7 +510,7 @@ class MPCController(BaseController):
                 self._prev_steer + max_delta_steer,
             )
         )
-        steer_cmd = float(np.clip(steer_cmd, -self.max_steer, self.max_steer))
+        steer_cmd = float(np.clip(steer_cmd, -effective_max_steer, effective_max_steer))
 
         steer_rate = (steer_cmd - self._prev_steer) / self._active_dt
         self._prev_accel = accel_cmd
@@ -493,6 +557,8 @@ class MPCController(BaseController):
         self._prev_accel = 0.0
         self._prev_steer = 0.0
         self._warm_start_u = None
+        self._warm_start_x = None
+        self._warm_start_y = None
         self.last_solve_info = {}
 
 
