@@ -75,7 +75,7 @@
 3. 运行分析脚本，检查结果和负结果是否合理。
 4. 写文档并更新：
    - 新增 `docs/11_baseline_and_ablation.md`（条件矩阵、结果表、配对统计、负结果、结论）；
-   - 更新 `README.md`、`docs/03_results_and_demo.md`、`docs/07_scope_and_future_work.md`、`docs/08_paper_draft.md`、`CHANGELOG_AI.md`；
+   - 更新 `README.md`、`docs/03_results_and_demo.md`、`docs/07_scope_and_future_work.md`、`docs/08_paper_draft.md`、`CHANGELOG.md`；
    - 新增 `results/contrast/README.md`（provenance、复现命令、产物说明）。
 5. 独立复核：测试、provenance、文档数字与 JSON/CSV 一致；不要夸大统计显著性。
 
@@ -162,7 +162,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 - `scripts/analyze_contrast.py`
 - `tests/test_baseline_algorithms.py`
 - `tests/test_contrast.py`
-- 本文件 `HANDOFF_BASELINE_ABLATION.md`
+- 本文件 `docs/history/2026-10-20_handoff_baseline_ablation.md`
 
 **换电脑前**：本 commit 已推到 GitHub 的 `main`；在另一台电脑 `git clone`/`git pull` 即可。若推送失败，则整目录拷贝（含 `.git`）。
 

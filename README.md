@@ -6,7 +6,7 @@
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![CI](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml)
 
-> 本地测试：157 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
+> 本地测试：164 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
 >
 > 本项目为**中国仿真创新应用大赛**参赛项目。当前版本（v0.4-core）聚焦一条**可运行、可验证、可复现**的闭环主链：
 >
@@ -18,7 +18,7 @@
 
 > **新增对比证据**：11 conditions × 3 scenarios × 30 seeds 的 990 次补充实验已完成，见 [基线与消融报告](docs/11_baseline_and_ablation.md)。Game/EM/MPC/Pacejka 保持实验性标记；它们已参与补充对比，安全性与标定仍待完善。原主结果未重跑或覆盖。
 >
-> 📖 **开发者与 AI 协作规范**：坐标系、变量口径、接口契约与验收标准见 [AI_SYSTEM_SPEC.md](AI_SYSTEM_SPEC.md)。
+> 📖 **工程规范**：坐标系、变量口径、接口契约与验收标准见 [docs/12_engineering_spec.md](docs/12_engineering_spec.md)。
 
 ---
 
@@ -44,7 +44,7 @@
 | **2. 数字模型或系统** | [docs/02_digital_models.md](docs/02_digital_models.md) | `src/vehicle_model/`（运动学）、`src/decision/`（FSM）、`src/planning/`（Lattice）、`src/control/`（LQR/PID） |
 | **3. 结果演示分析或说明** | [docs/03_results_and_demo.md](docs/03_results_and_demo.md) | `src/evaluation/metrics.py`、`src/visualization/`、`results/`（JSON/CSV/KPI） |
 | **4. 应用说明与工程落地** | [docs/04_application.md](docs/04_application.md) | `src/simulator.py`（MIL/SIL 闭环、教学实验） |
-| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、157 项本地测试、标准与文献列表 |
+| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、164 项本地测试、标准与文献列表 |
 
 > 复杂算法（Game/EM/MPC/Pacejka/交叉口）的说明保留在 [docs/06_qp_mpc_em_pacejka.md](docs/06_qp_mpc_em_pacejka.md)，并在 [docs/07_scope_and_future_work.md](docs/07_scope_and_future_work.md) 中明确标为未来工作。
 
@@ -77,7 +77,6 @@ flowchart LR
 ```
 intelligent-vehicle-simulation/
 ├── README.md                   # 项目总览（当前核心 + 未来工作）
-├── AI_SYSTEM_SPEC.md           # SSOT：坐标系、变量口径、接口契约、验收口径
 ├── configs/
 │   ├── default_config.yaml     # 车辆物理参数、感知、仿真步长
 │   └── scenarios/              # 三个核心场景 + 一个实验性交叉口
@@ -92,7 +91,8 @@ intelligent-vehicle-simulation/
 │   ├── 08_paper_draft.md       # 论文草稿（v0.4-core）
 │   ├── 09_slides_and_video_outline.md  # 答辩 PPT/视频大纲
 │   ├── 10_highd_calibration_replay.md  # highD 最小可信版
-│   └── 11_baseline_and_ablation.md  # 990-run 补充对比与负结果
+│   ├── 11_baseline_and_ablation.md  # 990-run 补充对比与负结果
+│   └── 12_engineering_spec.md  # 工程规范：坐标系、变量口径、接口契约、验收口径
 ├── src/
 │   ├── common/                 # 状态、Frenet、OBB-SAT、QP 后端
 │   ├── environment/            # 路网、场景加载、IDM/MOBIL、highD 解析、标定
@@ -105,7 +105,7 @@ intelligent-vehicle-simulation/
 │   ├── runner.py               # 场景 → 算法装配工厂
 │   └── simulator.py            # 闭环仿真主引擎
 ├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
-├── tests/                      # 157 项单元/闭环测试
+├── tests/                      # 164 项单元/闭环测试
 └── results/                    # 30-seed 核心基准 JSON/CSV、归档
 ```
 
@@ -183,7 +183,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B -m unittest discover tests -v
 ```
 
-当前 **157 项测试**，约 15–25 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
+当前 **164 项测试**，约 15–25 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
 
 ### 4. 运行核心基准（低功耗，30 seeds）
 

@@ -119,7 +119,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `docs/09` | 答辩 PPT 与演示视频大纲 |
 | `docs/10` | highD 最小可信版：标定 + 开环回放 |
 | `docs/11` | 独立990-run基线/消融；逐场景统计、负结果、复现与局限 |
-| `AI_SYSTEM_SPEC.md` | SSOT：接口/量纲/验收口径 |
+| `docs/12_engineering_spec.md` | 工程规范：接口/量纲/验收口径 |
 
 
 ## 7. 本轮范围更新：实验覆盖不等于能力验收

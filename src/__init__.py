@@ -8,7 +8,10 @@ China Simulation Innovation Application Competition (SIAC)
 
 from typing import Any
 
-__all__ = ["SimulationEngine"]
+# 与 pyproject.toml 的 [project] version 保持一致；v0.4-core 为当前提交范围。
+__version__ = "0.4.0"
+
+__all__ = ["SimulationEngine", "__version__"]
 
 
 def __getattr__(name: str) -> Any:

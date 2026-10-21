@@ -1,11 +1,11 @@
-# 智能车辆仿真系统：全栈架构规范、变量量纲口径与 AI 协作开发指南
-### Intelligent Vehicle Simulation System: Architecture, Conventions, and AI Collaboration Specification
+# 智能车辆仿真系统：架构规范、变量量纲口径与接口契约
+### Intelligent Vehicle Simulation System: Architecture, Conventions, and Interface Contracts
 
 > **版本**：v0.4-core（2026-10-20）。本版把范围收敛到 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**；Game/EM/MPC/Pacejka/交叉口/真实 highD 标定/联合仿真统一列为未来工作。v0.3 中的 QP/MPC/EM/Pacejka 实现仍保留为技术储备，但不纳入当前主结果。范围清单见 `docs/07_scope_and_future_work.md`。新增独立基线/消融结果见 `docs/11_baseline_and_ablation.md`：990次、每条件/场景30个感知噪声seeds；实验覆盖不等于安全/泛化验收，原主结果未改。
 
 > **说明文档定位**：本规范文件为本项目（中国仿真创新应用大赛参赛作品）的**单一真实数据源（Single Source of Truth, SSOT）**。旨在统一整个系统内部的所有数学物理坐标系、状态变量命名口径、量纲单位及模块间交互契约。
 > 
-> **面向对象**：后续维护本项目的开发者、评审专家，以及**接入本代码库进行迭代开发、算法补全与重构的 AI 编程助手（如 Gemini、Claude、Cursor、Copilot、ChatGPT 等）**。任何后续 AI 或工程师在修改/新增代码前，**必须严格遵循本规范中定义的命名法则与接口契约**。
+> **面向对象**：维护本项目的开发者与评审专家。任何人在修改或新增代码前，应严格遵循本规范中定义的命名法则与接口契约。
 
 ---
 
@@ -14,7 +14,7 @@
 - [二、 变量命名口径与物理量纲字典 (Data Dictionary)](#二-变量命名口径与物理量纲字典-data-dictionary)
 - [三、 核心模块数据流与调用拓扑 (Dataflow & Topology)](#三-核心模块数据流与调用拓扑-dataflow--topology)
 - [四、 模块职责边界与修改扩展契约 (Invariants & Extension Contracts)](#四-模块职责边界与修改扩展契约-invariants--extension-contracts)
-- [五、 后续 AI 工具修改代码操作守则 (AI Prompt & Development Rules)](#五-后续-ai-工具修改代码操作守则-ai-prompt--development-rules)
+- [五、 代码修改操作守则 (Development Rules)](#五-代码修改操作守则-development-rules)
 - [六、 当前实现边界与验收口径（v0.4-core）](#六-当前实现边界与验收口径v04-core)
 
 ---
@@ -196,7 +196,7 @@ sequenceDiagram
 
 ## 四、 模块职责边界与修改扩展契约 (Invariants & Extension Contracts)
 
-后续开发或 AI 助手在修改具体模块时，**必须保持以下不变量（Invariants）与职责隔离**：
+后续开发者在修改具体模块时，**必须保持以下不变量（Invariants）与职责隔离**：
 
 ### 1. `src/common/` (基础层)
 - **职责**：纯数学与纯数据类，**绝对不允许引用** `decision`、`planning`、`control` 等业务逻辑模块；
@@ -249,12 +249,12 @@ sequenceDiagram
 
 ---
 
-## 五、 后续 AI 工具修改代码操作守则 (AI Prompt & Development Rules)
+## 五、 代码修改操作守则 (Development Rules)
 
-若您是使用其他 AI 软件（如 Claude, Cursor, Copilot 等）进行辅助修改，请将以下守则作为系统 Prompt 的一部分传递给 AI：
+修改核心模块前，请先对照以下守则：
 
 ```markdown
-### AI 辅助开发准则：
+### 开发准则：
 1. 【量纲一致性】：所有代码中的空间长度必须为米(m)，速度为米/秒(m/s)，时间为秒(s)，角速度为弧度/秒(rad/s)，绝对禁止随意引入非国际标准量纲。
 2. 【接口继承】：修改或新增规划算法时，必须继承 src.planning.base_planner.BasePlanner；修改决策算法必须继承 src.decision.base_decision.BaseDecisionMaker。
 3. 【坐标变换】：任何需要完整 Frenet 状态 (s, l, s_d, l_d, l', ...) 的笛卡尔→参考线映射，必须统一调用 src.common.frenet_frame.FrenetConverter；严禁在各算法内部重复编写易出错的完整旋转/投影方程。**例外**：车道归属查询、同车道前后车筛选可使用 RoadNetwork 的车道中心几何，但不得据此替代 Frenet 状态转换。
@@ -354,5 +354,5 @@ sequenceDiagram
   不宣称全研究多重比较已控制，也不将噪声重复当作场景分布抽样。
 - 动力学敏感性结果保留后轴/质心原点混杂说明。Pacejka相对proposed同时改变动力学和轮胎；
   不能将其统一对proposed的差值称为纯轮胎消融效应。
-- 完整测试实际为157项（含基线算法、对比统计、TTC 口径、完成时刻一致性、MOBIL 车道边界等回归用例）。
+- 完整测试实际为164项（含基线算法、对比统计、TTC 口径、完成时刻一致性、MOBIL 车道边界等回归用例）。
   不改 `src/`、场景参数、测试或原 `results/benchmark*.csv/json`，不调参或删除负结果。

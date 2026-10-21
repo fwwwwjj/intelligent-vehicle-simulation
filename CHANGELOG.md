@@ -1,4 +1,4 @@
-# AI 修改记录
+# 修改记录
 
 ## 2026-10-21 (指标口径与车道边界修复；主结果按新口径重跑)
 
@@ -23,7 +23,7 @@
   environment/scenario_loader,planning/frenet_lattice,planning/cost_evaluator,
   control/lqr_controller,runner}.py；tests/{test_metrics,test_obstacle_manager,
   test_task_success}.py；requirements.txt、pyproject.toml、.github/workflows/ci.yml；
-  README、docs/03、docs/05、docs/08、AI_SYSTEM_SPEC、results/{README,benchmark.*,
+  README、docs/03、docs/05、docs/08、docs/12_engineering_spec、results/{README,benchmark.*,
   competition_pack/kpi_table.md}、results/contrast/*（局部刷新）、docs/11。
 - **主结果重跑**：90 次（3 场景 × 30 seeds，20 s），约 2 min 53 s，单线程 + `nice`。
   安全/舒适指标与旧表逐位一致（净距 1.84/5.47/14.11，TTC 20.41/1.75/2.37，
@@ -31,7 +31,7 @@
 - **对比实验局部刷新**：仅 `ablation_controller_mpc` 含碰撞（53/90），重跑该条件 90 次，
   其余 10 条件原样保留；`metadata.partial_refresh` 记录原因与 commit。
   `validation.json` 为历史凭证，其原主结果哈希与重跑后的主结果按设计不再匹配。
-- **验证**：157 项测试通过（新增 TTC=0、完成时刻一致性、MOBIL 车道边界、解析默认值回归）。
+- **验证**：164 项测试通过（新增 TTC=0、完成时刻一致性、MOBIL 车道边界、解析默认值回归）。
 
 ## 2026-10-20 (独立30-seed基线与消融正式结果)
 
@@ -41,7 +41,7 @@
   参数/环境快照、验证记录与README；新增scripts/export_contrast_study.py（只分析/校验、不仿真）；
   scripts/analyze_contrast.py仅调整散点图标签编号/布局以消除重叠，不修改统计逻辑；
   校验器仅允许Git检出造成的LF/CRLF等价，保留原始指纹并另报本机字节一致性；
-  新增docs/11_baseline_and_ablation.md；更新README、docs/03/05/07/08、AI_SYSTEM_SPEC、历史交接状态及本记录。
+  新增docs/11_baseline_and_ablation.md；更新README、docs/03/05/07/08、docs/12_engineering_spec、历史交接状态及本记录。
 - **实验**：11条件×3场景×30 seeds(42–71)=990次，每次20 s/dt0.05，单进程、单线程BLAS、
   Windows空闲优先级；原脚本的git_dirty=false、commit及场景SHA-256已核实，全部失败保留。
 - **结果口径**：表格由脚本从正式JSON生成；配对bootstrap、exact McNemar、Wilcoxon、
@@ -55,18 +55,18 @@
 
 ## 2026-10-20 (文档修正：README 目录/CI 徽标/运动学保真度/cut-in TTC)
 
-- **修改文件**：`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/08_paper_draft.md`、`docs/09_slides_and_video_outline.md`、`AI_SYSTEM_SPEC.md`、`results/competition_pack/kpi_table.md`、`CHANGELOG_AI.md`。
+- **修改文件**：`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/08_paper_draft.md`、`docs/09_slides_and_video_outline.md`、`docs/12_engineering_spec.md`、`results/competition_pack/kpi_table.md`、`CHANGELOG.md`。
 - **修改内容**：
   1. README 文件树补齐 `docs/08`、`docs/09`、`docs/10`，并同步 scripts 目录说明；
   2. 移除静态 “tests 96 local” 徽标，保留 GitHub Actions CI 徽标，并注明“本地 96 项通过，CI 以 Actions 为准”；
-  3. 在 README/docs/02/docs/03/docs/08/AI_SPEC 中增加**运动学模型保真度声明**：不含轮胎侧滑、载荷转移、悬架/制动动力学与传感器/执行器硬件延迟，不是高保真车辆动力学/HIL；
+  3. 在 README/docs/02/docs/03/docs/08/docs/12_engineering_spec 中增加**运动学模型保真度声明**：不含轮胎侧滑、载荷转移、悬架/制动动力学与传感器/执行器硬件延迟，不是高保真车辆动力学/HIL；
   4. 在 docs/03 §3.4 与 docs/08 §6.1 增加 **cut-in 最小 TTC ≈1.75 s 的专门解释**：属于刻意激进切入、紧安全余量但无碰撞；最小净距 5.47 m、最大制动 5.94 m/s²；不能写成“安全余量充足”；
   5. README 核心结果表增加 TTC 备注；答辩 Q&A 增加对应问题。
 - **验证方式及结果**：`git diff --check` 通过；本次仅文档与 KPI 表修改，代码未变，96 项测试状态不变。
 
 ## 2026-10-20 (v0.4-core：范围收敛到 FSM + Lattice + LQR，复杂算法转为未来工作)
 
-- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`src/evaluation/benchmark.py`、`src/environment/road_network.py`、`src/environment/scenario_loader.py`、`src/planning/frenet_lattice.py`、`src/runner.py`、`src/control/lqr_controller.py`、`src/control/mpc_controller.py`、`scripts/run_benchmark.py`、`scripts/export_core_figures.py`（新增）、`scripts/export_competition_assets.py`、`tests/test_task_success.py`（新增）、`tests/test_closed_loop.py`、`.github/workflows/ci.yml`（恢复）、`LICENSE`（新增）、`README.md`、`docs/02`、`docs/03`、`docs/04`、`docs/05`、`docs/06`、`docs/07`（新增）、`docs/08_paper_draft.md`（新增）、`AI_SYSTEM_SPEC.md`、`results/*`、`CHANGELOG_AI.md`。
+- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`src/evaluation/benchmark.py`、`src/environment/road_network.py`、`src/environment/scenario_loader.py`、`src/planning/frenet_lattice.py`、`src/runner.py`、`src/control/lqr_controller.py`、`src/control/mpc_controller.py`、`scripts/run_benchmark.py`、`scripts/export_core_figures.py`（新增）、`scripts/export_competition_assets.py`、`tests/test_task_success.py`（新增）、`tests/test_closed_loop.py`、`.github/workflows/ci.yml`（恢复）、`LICENSE`（新增）、`README.md`、`docs/02`、`docs/03`、`docs/04`、`docs/05`、`docs/06`、`docs/07`（新增）、`docs/08_paper_draft.md`（新增）、`docs/12_engineering_spec.md`、`results/*`、`CHANGELOG.md`。
 - **修改内容**：
   1. **范围收敛**：当前核心交付定为 **HFSM + Frenet Lattice + LQR + 运动学模型 + 任务级 KPI + 三个核心场景**（highway_merge / cut_in / emergency_avoidance）。Game、EM/QP、LTV-MPC、Pacejka、城市无保护路口、MOBIL 统计、highD 真实标定、OpenSCENARIO/ROS/CARLA 统一列为未来工作；代码与接口保留，但不纳入主结果。
   2. **任务级 success**：`success_rate` 不再只判断碰撞，而是由场景目标 + 无碰撞 + 不驶出道路共同决定；新增 `task_success`、`task_completed`、`task_completion_time_s`、`road_departure` 字段。这样 Game 未汇入、交叉口驶出道路都会自动判 0，避免“没做事也算成功”。
@@ -89,7 +89,7 @@
 
 > 说明：本节的 Game 50.4%/34.9% 对比结论已作废——v0.4-core 审计发现 Game 在 20 s 内未完成汇入，任务不等价，不能作为主结果。
 
-- **修改文件**：`src/decision/game_theoretic.py`、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`configs/scenarios/highway_merge.yaml`、`src/evaluation/benchmark.py`、`.gitignore`、`results/README.md`、`requirements.txt`、`.github/workflows/ci.yml`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。
+- **修改文件**：`src/decision/game_theoretic.py`、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`configs/scenarios/highway_merge.yaml`、`src/evaluation/benchmark.py`、`.gitignore`、`results/README.md`、`requirements.txt`、`.github/workflows/ci.yml`、`docs/03_results_and_demo.md`、`CHANGELOG.md`。
 - **修改内容**：
   1. **决策对抗性与博弈区分度**：
      - 在 `highway_merge` 场景中增加左侧邻道阻挡车（`obs_block_left`），构建主线紧凑车流与后车加速逼近的对抗工况；
@@ -106,7 +106,7 @@
 
 ## 2026-10-20 (优化规划计算几何与碰撞距离粗筛，时延 p95 降至 10ms 内)
 
-- **修改文件**：`src/common/geometry.py`、`src/planning/cost_evaluator.py`、`src/common/frenet_frame.py`、`docs/03_results_and_demo.md`、`CHANGELOG_AI.md`。
+- **修改文件**：`src/common/geometry.py`、`src/planning/cost_evaluator.py`、`src/common/frenet_frame.py`、`docs/03_results_and_demo.md`、`CHANGELOG.md`。
 - **修改内容**：
   1. 在 `cost_evaluator.py` 中引入外接圆与 AABB 几何双重粗筛，中心距与轴向距离超出 $R_1 + R_2 + 3.0\text{m}$ 时直接跳过昂贵的 OBB SAT 与点线段计算；
   2. 优化 `CollisionChecker.check_obb_collision`，以标量轴向投影计算代替逐点生成顶点小数组，单次 SAT 调用耗时降低约 20 倍；
@@ -117,7 +117,7 @@
 
 ## 2026-10-20 (修复回退诊断指标与 P95 时延口径)
 
-- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`tests/test_metrics.py`、`docs/06_qp_mpc_em_pacejka.md`、`AI_SYSTEM_SPEC.md`、`CHANGELOG_AI.md`。
+- **修改文件**：`src/simulator.py`、`src/evaluation/metrics.py`、`tests/test_metrics.py`、`docs/06_qp_mpc_em_pacejka.md`、`docs/12_engineering_spec.md`、`CHANGELOG.md`。
 - **修改内容**：
   1. 在 `SimulationEngine.step()` 中从规划器（`EMPlanner.last_path_result` / `last_speed_result`）与控制器（`MPCController.last_solve_info`）读取真实求解与回退状态，向 `SimulationMetricsRecord` 填写真实的 `planner_fallback` 与 `controller_fallback`；
   2. 明确回退口径：EM 路径/速度 QP 未成功或空轨迹记为规划回退，Lattice 稳定记为 False；MPC QP 未成功或空轨迹记为控制回退，LQR 稳定记为 False；
@@ -141,18 +141,18 @@
 
 ## 2026-10-19
 
-- **修改文件**：`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/evaluation/benchmark.py`、`scripts/run_benchmark.py`、`configs/scenarios/highway_merge.yaml`、`configs/scenarios/cut_in.yaml`、`tests/test_closed_loop.py`、`tests/test_obstacle_manager.py`、`tests/test_metrics.py`、`AI_SYSTEM_SPEC.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG_AI.md`
+- **修改文件**：`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/evaluation/benchmark.py`、`scripts/run_benchmark.py`、`configs/scenarios/highway_merge.yaml`、`configs/scenarios/cut_in.yaml`、`tests/test_closed_loop.py`、`tests/test_obstacle_manager.py`、`tests/test_metrics.py`、`docs/12_engineering_spec.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG.md`
 - **修改内容**：
   1. 增加场景级 `traffic.enable_mobil` / `lane_width` 配置；`highway_merge` 显式启用 MOBIL，其他场景维持按配置关闭；内置场景与 YAML 行为保持同步。
   2. 增加障碍物脚本化平滑换道调度；`cut_in` 车辆按配置的目标车道、开始时刻和持续时间切入，行为由闭环测试验证。
   3. 基准 JSON 增加执行参数、Python 版本、Git 提交号、场景配置 SHA-256 指纹、逐次原始结果和分组统计；新增原始运行 CSV 与分组汇总 CSV。批量成功率由每次运行 0/1 结果求均值，并提供 Wilson 95% 区间；连续指标报告均值及样本标准差。
   4. 更新 SSOT、README 和技术支撑文档，删除过时/无依据的实现状态和实验数字。
-- **验证方式及结果**：GPT-6 Luna 运行 `python3 -m unittest discover tests -v`，39 项全部通过（3.134 秒）；`git diff --check` 通过。执行三场景（`highway_merge`、`emergency_avoidance`、`cut_in`）× FSM/Game × seeds 42/43/44、每次 3.5 s 的轻量 benchmark，18 次运行完成，生成 `results/benchmark.json`、`results/benchmark.csv`、`results/benchmark_summary.csv`。该短时合成场景运行仅用于验证场景和统计管线，不作为性能结论。
+- **验证方式及结果**：本机运行 `python3 -m unittest discover tests -v`，39 项全部通过（3.134 秒）；`git diff --check` 通过。执行三场景（`highway_merge`、`emergency_avoidance`、`cut_in`）× FSM/Game × seeds 42/43/44、每次 3.5 s 的轻量 benchmark，18 次运行完成，生成 `results/benchmark.json`、`results/benchmark.csv`、`results/benchmark_summary.csv`。该短时合成场景运行仅用于验证场景和统计管线，不作为性能结论。
 - **未完成/边界**：没有接入真实 highD 原始数据；短时、每组 3 个 seed 的 smoke benchmark 不足以支持泛化或竞赛统计结论；MPC、EM/QP 与 Pacejka 主回路仍未实现。本次未提交或推送。
 
 ## 2026-10-19 21:26:00
 
-- **修改文件**：`test`（删除）、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/environment/calibration.py`（新增）、`src/environment/__init__.py`、`scripts/generate_sample_highd.py`（新增）、`configs/scenarios/cut_in.yaml`（新增）、`tests/test_calibration.py`（新增）、`tests/test_obstacle_manager.py`、`tests/test_closed_loop.py`、`tests/test_dataset_loader.py`、`data/README.md`、`docs/01_problem_and_data.md`、`docs/02_digital_models.md`、`AI_SYSTEM_SPEC.md`、`README.md`、`CHANGELOG_AI.md`
+- **修改文件**：`test`（删除）、`src/environment/obstacle_manager.py`、`src/environment/scenario_loader.py`、`src/environment/calibration.py`（新增）、`src/environment/__init__.py`、`scripts/generate_sample_highd.py`（新增）、`configs/scenarios/cut_in.yaml`（新增）、`tests/test_calibration.py`（新增）、`tests/test_obstacle_manager.py`、`tests/test_closed_loop.py`、`tests/test_dataset_loader.py`、`data/README.md`、`docs/01_problem_and_data.md`、`docs/02_digital_models.md`、`docs/12_engineering_spec.md`、`README.md`、`CHANGELOG.md`
 - **修改内容**：
   1. 删除根目录下无内容的残留文件 `test`；
   2. 解决真实数据缺乏的工程方案：编写 `scripts/generate_sample_highd.py` 本地一键生成合规的微型 highD 演示切片（~20KB），使 `HighDDatasetLoader` 具备开箱即用的解析与切片查询演示能力；
@@ -166,7 +166,7 @@
 
 ## 2026-10-19 16:52:50
 
-- **修改文件**：`src/environment/obstacle_manager.py`、`tests/test_obstacle_manager.py`、`AI_SYSTEM_SPEC.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG_AI.md`
+- **修改文件**：`src/environment/obstacle_manager.py`、`tests/test_obstacle_manager.py`、`docs/12_engineering_spec.md`、`README.md`、`docs/02_digital_models.md`、`docs/03_results_and_demo.md`、`docs/05_references.md`、`CHANGELOG.md`
 - **修改内容**：障碍物预测开始使用最近一次 IDM 计算的纵向加速度进行恒加速度外推，预测速度降至零后保持位置；新增 IDM 加速和制动停车预测测试。同步环境模型说明及测试数量（28 项改为 30 项）。检查发现仓库未包含文档所称的 benchmark JSON/CSV 原始输出，因此移除无法追溯的 KPI 数值表，保留复现命令。
 - **修改原因**：避免规划器把正在加速或制动的 IDM 车辆错误地当作恒速目标；保持规范和测试说明与实现一致；不将缺少仓库证据的实验结果继续作为当前可复现结论。
 - **验证方式及结果**：`python3 -m unittest discover tests -v`，30 项通过；`git diff --check` 通过。未运行 benchmark，未执行真实数据标定或外部联调。
