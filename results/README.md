@@ -47,7 +47,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
 | `success_rate` | float | **任务级成功率**：完成任务 + 无碰撞 + 不驶出道路；0/1 |
 | `task_success` | float | 与 `success_rate` 同口径的数值字段，便于分组统计 |
 | `task_completed` | float | 是否完成场景目标（`highway_merge` 进入主车道；交叉口进入北向出口） |
-| `task_completion_time_s` | float | 首次完成时刻；非离散任务记 999（不解释为 999 s 完成） |
+| `task_completion_time_s` | float | 首次满足任务判据的时刻；未完成时记 999 哨兵（不解释为 999 s 完成） |
 | `road_departure` | float | 是否驶出道路（到最近车道中心线 > 半车道宽 + 0.5 m） |
 | `collision_count` | float | 逐帧碰撞障碍物数量之和 |
 | `collision_frames` | float | 发生碰撞的帧数 |

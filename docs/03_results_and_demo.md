@@ -23,7 +23,7 @@
 | :--- | :--- |
 | **任务成功 (task_success)** | 由场景目标 + 安全 + 车道偏离共同判定，见 §2.1；不再是“未碰撞” |
 | **任务完成 (task_completed)** | `highway_merge` 进入主车道；`intersection` 进入北向出口；其他场景由终态判据给出 |
-| **完成时间 (task_completion_time_s)** | 首次满足任务目标的时刻；非离散任务记 999（不参与均值解释） |
+| **完成时间 (task_completion_time_s)** | 首次满足任务判据的时刻（汇入进入主车道 / cut_in 安全间距首次达标 / 紧急制动首次停稳）；未完成的任务记 999 哨兵，不表示 999 s |
 | **驶出道路 (road_departure)** | 到最近车道中心线距离 > 半车道宽 + 0.5 m |
 | **碰撞 (Collision)** | 自车 OBB 与障碍物 OBB 做 SAT 检测，`buffer=0`；任一步相交记 `is_collision=True` |
 | **最小 OBB 净距** | 两矩形边界的最短距离；相交为 0 |
