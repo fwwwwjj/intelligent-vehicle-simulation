@@ -72,7 +72,9 @@ class TestPerformanceEvaluator(unittest.TestCase):
         self.assertEqual(report["collision_frames"], 2.0)
         self.assertAlmostEqual(report["collision_rate"], 2.0 / 3.0)
         self.assertAlmostEqual(report["min_obstacle_distance_m"], 0.5)
-        self.assertAlmostEqual(report["min_ttc_s"], 5.0)
+        # TTC=0 表示该帧已贴靠/追尾，必须作为最小值保留。早期实现用
+        # ``0.0 < ttc`` 过滤，会得到 5.0，与 min_distance=0.5 自相矛盾。
+        self.assertAlmostEqual(report["min_ttc_s"], 0.0)
         self.assertAlmostEqual(report["rms_jerk_m_s3"], float(np.sqrt(20.0 / 3.0)))
         self.assertAlmostEqual(report["max_accel_m_s2"], 1.0)
         self.assertAlmostEqual(report["max_decel_m_s2"], -1.0)
@@ -94,6 +96,24 @@ class TestPerformanceEvaluator(unittest.TestCase):
 
     def test_empty_evaluator_returns_empty_report(self):
         self.assertEqual(PerformanceEvaluator().compute_summary_report(), {})
+
+    def test_zero_ttc_is_kept_as_minimum(self):
+        """碰撞帧的 TTC=0 不能被当成"无效值"丢弃，否则安全指标被美化。"""
+        evaluator = PerformanceEvaluator()
+        evaluator.record_step(_record(0.05, min_distance=8.0, min_ttc=1.2))
+        evaluator.record_step(_record(
+            0.10, min_distance=0.0, min_ttc=0.0, is_collision=True, collision_count=1
+        ))
+        report = evaluator.compute_summary_report()
+        self.assertEqual(report["min_ttc_s"], 0.0)
+        self.assertEqual(report["min_obstacle_distance_m"], 0.0)
+        self.assertEqual(report["collision_frames"], 1.0)
+
+    def test_no_lead_vehicle_reports_sentinel_ttc(self):
+        """全部帧 TTC 均为 999（前方无约束目标）时，仍应返回哨兵 999。"""
+        evaluator = PerformanceEvaluator()
+        evaluator.record_step(_record(0.05, min_distance=50.0, min_ttc=999.0))
+        self.assertEqual(evaluator.compute_summary_report()["min_ttc_s"], 999.0)
 
     def test_reset_clears_records(self):
         evaluator = PerformanceEvaluator()

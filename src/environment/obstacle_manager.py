@@ -86,16 +86,43 @@ class ObstacleManager:
     负责多障碍物的步进模拟、轨迹预测生成与查询。
     支持 IDM 跟驰与 MOBIL 协同换道模型。
     """
-    def __init__(self, enable_mobil: bool = False, lane_width: float = 3.75):
+    def __init__(
+        self,
+        enable_mobil: bool = False,
+        lane_width: float = 3.75,
+        lane_centers: Optional[List[float]] = None,
+    ):
         self.obstacles: Dict[str, ObstacleState] = {}
         self.idm_models: Dict[str, IntelligentDriverModel] = {}
         self._last_accelerations: Dict[str, float] = {}
         self.mobil_model = MOBILLaneChangeModel()
         self.enable_mobil: bool = enable_mobil
         self.lane_width: float = lane_width
+        # 真实车道中心 y 坐标（升序）。提供时 MOBIL 只在这些中心之间换道，
+        # 避免"用 y ± lane_width 推算"把车换到路外不存在的车道。
+        self.lane_centers: Optional[List[float]] = (
+            sorted(float(y) for y in lane_centers) if lane_centers else None
+        )
         self._lane_change_states: Dict[str, Dict[str, Any]] = {}
         self._scheduled_lane_changes: Dict[str, Dict[str, float]] = {}
         self.current_time: float = 0.0
+
+    def _candidate_lane_centers(self, obs: ObstacleState) -> List[float]:
+        """返回换道候选目标车道的中心 y：有真实车道表时只取相邻车道，否则按路宽推算。"""
+        if self.lane_centers:
+            if len(self.lane_centers) < 2:
+                return []
+            index = min(
+                range(len(self.lane_centers)),
+                key=lambda i: abs(self.lane_centers[i] - obs.y),
+            )
+            return [
+                self.lane_centers[j]
+                for j in (index - 1, index + 1)
+                if 0 <= j < len(self.lane_centers)
+            ]
+        # 回退路径：无车道表时只保证不越过 y=0（原行为），保留给独立使用场景。
+        return [y for y in (obs.y + self.lane_width, obs.y - self.lane_width) if y >= -1e-3]
 
     def add_obstacle(self, obstacle: ObstacleState, idm: Optional[IntelligentDriverModel] = None) -> None:
         """注册障碍物"""
@@ -180,8 +207,8 @@ class ObstacleManager:
         if idm is None:
             return None
 
-        # 优先考虑左右车道（限制在主线车道范围内，避免背景车违规向匝道换道）
-        candidate_ys = [y for y in (obs.y + self.lane_width, obs.y - self.lane_width) if y >= -1e-3]
+        # 优先考虑相邻车道（有真实车道表时严格限制在既有车道内）
+        candidate_ys = self._candidate_lane_centers(obs)
         for target_y in candidate_ys:
             # 空间几何间距初检：防止目标车道并排侧撞或侵入盲区安全间距
             has_side_collision = any(

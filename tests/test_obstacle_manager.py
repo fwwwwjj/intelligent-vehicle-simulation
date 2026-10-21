@@ -77,5 +77,39 @@ class TestObstaclePrediction(unittest.TestCase):
         self.assertAlmostEqual(follower.y, 3.75, delta=0.5)
 
 
+class TestMobilLaneBounds(unittest.TestCase):
+    """MOBIL 必须只在真实车道之间换道，不能靠 y ± lane_width 推算到路外。
+
+    回归背景：2 车道公路（y=0 / 3.75）上，身处 y=3.75 的车向上换道的候选
+    曾被算成 y=7.5，即"越出道路"，且换道完成后会再次评估，可连续越界。
+    """
+
+    def test_candidate_centers_exclude_offroad_lane(self):
+        manager = ObstacleManager(enable_mobil=True, lane_width=3.75, lane_centers=[0.0, 3.75])
+        car = _car("car", 0.0, 6.0)
+        car.y = 3.75
+        self.assertEqual(manager._candidate_lane_centers(car), [0.0])
+
+    def test_mobil_never_targets_nonexistent_lane(self):
+        manager = ObstacleManager(enable_mobil=True, lane_width=3.75, lane_centers=[0.0, 3.75])
+        car = _car("car", 0.0, 6.0)
+        car.y = 3.75
+        blocker = _car("blocker", 12.0, 0.0)
+        blocker.y = 3.75
+        manager.add_obstacle(car, IntelligentDriverModel(v0=25.0))
+        manager.add_obstacle(blocker)
+
+        # current_accel 取强负值，确保激励准则成立、进入"选目标车道"分支
+        target_y = manager._evaluate_mobil_lane_change("car", car, -6.0)
+        self.assertIn(target_y, (None, 0.0))
+        self.assertNotEqual(target_y, 7.5)
+
+    def test_no_lane_table_falls_back_without_crash(self):
+        manager = ObstacleManager(enable_mobil=True, lane_width=3.75)
+        car = _car("car", 0.0, 6.0)
+        # 无车道表时退回旧的 ±lane_width 推算，且仍过滤 y<0 一侧
+        self.assertEqual(manager._candidate_lane_centers(car), [3.75])
+
+
 if __name__ == "__main__":
     unittest.main()

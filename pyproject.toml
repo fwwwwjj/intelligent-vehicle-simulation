@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intelligent-vehicle-simulation"
+version = "0.4.0"
+description = "面向智能车辆行为决策与路径规划的数字建模及仿真系统 (SIAC v0.4-core)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "intelligent-vehicle-simulation contributors" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+
+# 运行期依赖以 requirements.txt 为准（含版本上限与复现说明），这里只声明
+# 核心链路真正必需的一项，避免两处版本约束互相打架。
+dependencies = ["numpy>=1.23.0,<=2.2.2"]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.6.0,<=3.10.0"]
+data = ["pandas>=1.5.0,<=2.3.3", "pyyaml>=6.0,<=6.0.3"]
+dev = ["pytest>=7.2.0,<=8.4.2"]
+
+[tool.setuptools.packages.find]
+# 源码以 `src.` 为包前缀被导入（tests/scripts 均按 `from src.x import y`），
+# 因此这里必须把 src 及其子包一并纳入，editable 安装后才能直接 import。
+include = ["src*"]
+
+[tool.pytest.ini_options]
+# 保证在仓库根目录之外执行 pytest 也能解析 `import src`
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]

@@ -124,13 +124,16 @@ class TrajectoryCostEvaluator:
 
         # Lateral jerk estimated in Frenet path coordinates. Curvature-rate
         # captures steering transients and suppresses sharp S-shaped nudges.
-        for i in range(1, len(trajectory.points)):
-            prev, pt = trajectory.points[i - 1], trajectory.points[i]
-            delta_t = max(1e-3, pt.t - prev.t)
-            lat_acc_prev = prev.v ** 2 * prev.kappa
-            lat_acc = pt.v ** 2 * pt.kappa
-            lateral_jerk = (lat_acc - lat_acc_prev) / delta_t
-            cost_lateral_jerk += lateral_jerk ** 2 * delta_t
+        # 注意：循环从 i=0 开始，保证**轨迹首点（t=0，即当前位姿）也参与碰撞
+        # 与净距检查**；横向 jerk 需要前一点，因此仅在 i>0 时累加。
+        for i, pt in enumerate(trajectory.points):
+            if i > 0:
+                prev = trajectory.points[i - 1]
+                delta_t = max(1e-3, pt.t - prev.t)
+                lat_acc_prev = prev.v ** 2 * prev.kappa
+                lat_acc = pt.v ** 2 * pt.kappa
+                lateral_jerk = (lat_acc - lat_acc_prev) / delta_t
+                cost_lateral_jerk += lateral_jerk ** 2 * delta_t
 
             if not obstacles:
                 continue

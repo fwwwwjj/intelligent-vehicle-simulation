@@ -436,6 +436,18 @@ def _build_from_dict(data: Dict[str, Any], config: Dict[str, Any], name: str = "
     manager = ObstacleManager(
         enable_mobil=bool(traffic_cfg.get("enable_mobil", False)),
         lane_width=float(traffic_cfg.get("lane_width", lane_width)),
+        # 传入真实车道中心，MOBIL 才不会把背景车换到 y = ±lane_width 推算出的假车道。
+        # 只取"主线 + 水平直线"车道：匝道与转弯车道不参与背景车换道候选。
+        lane_centers=[
+            lane.center_points[0][1]
+            for lane_id, lane in road.lanes.items()
+            if lane.center_points
+            and lane_id.startswith("main_lane")
+            and all(
+                abs(pt[1] - lane.center_points[0][1]) < 1e-6
+                for pt in lane.center_points
+            )
+        ],
     )
     for item in data.get("obstacles", []):
         state_cfg = item.get("initial_state", {})

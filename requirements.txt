@@ -1,16 +1,24 @@
-# 核心计算与科学库（已在 Python 3.9.6 环境下全量验证）
-numpy>=1.23.0,<=2.0.2
-scipy>=1.9.0,<=1.13.1
-pandas>=1.5.0,<=2.2.3
+# 核心计算与科学库
+#
+# 版本下限 = 项目开始验证的版本；上限 = 已实测通过的最高版本。
+# 注意：上限必须覆盖「核心基准」与「990 次基线/消融实验」两套实际运行环境，
+# 否则按本文件安装出的环境无法复现 results/ 中的产物。
+#   - 核心基准（results/benchmark*.csv|json）：Python 3.9.6 / numpy 2.0.2
+#   - 对比实验（results/contrast/）：Python 3.13.1 / numpy 2.2.2 /
+#     scipy 1.15.1 / matplotlib 3.10.0 / PyYAML 6.0.3
+#     见 results/contrast/environment.json
+numpy>=1.23.0,<=2.2.2
+scipy>=1.9.0,<=1.15.1
+pandas>=1.5.0,<=2.3.3
 
 # 可视化与图形渲染
-matplotlib>=3.6.0,<=3.9.2
+matplotlib>=3.6.0,<=3.10.0
 
 # 场景配置与数据序列化
-pyyaml>=6.0,<=6.0.2
+pyyaml>=6.0,<=6.0.3
 
 # 测试与代码质量
-pytest>=7.2.0,<=8.3.3
+pytest>=7.2.0,<=8.4.2
 black>=23.0.0,<=24.8.0
 flake8>=6.0.0,<=7.1.1
 typing-extensions>=4.5.0,<=4.12.2
@@ -19,4 +27,5 @@ typing-extensions>=4.5.0,<=4.12.2
 # - cvxpy / osqp / pygame / seaborn / shapely 当前未使用，已从必需依赖中移除；
 # - EM/QP 与 MPC 使用 src/common/qp.py 的纯 NumPy ADMM，无需 cvxpy / osqp；
 #   如需更高性能，可安装 osqp 后替换 QP 后端；
-# - 无 SciPy 时 LQR 会回退到 numpy Riccati 迭代，仍可运行测试。
+# - 无 SciPy 时 LQR 会回退到 numpy Riccati 迭代，仍可运行测试；
+# - CI 只安装 numpy / pandas / pyyaml，核心测试不依赖 scipy 与 matplotlib。

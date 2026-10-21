@@ -32,6 +32,14 @@ def _vehicle_params(scenario: Scenario) -> dict:
     return dict(scenario.vehicle_params or {})
 
 
+def _lane_half_width(scenario: Scenario, default_lane_width: float = 3.75) -> float:
+    """从路网读取真实车道半宽，供规划器限制横向候选范围。"""
+    lanes = getattr(scenario.road_network, "lanes", None) or {}
+    widths = sorted(float(lane.width) for lane in lanes.values() if float(lane.width) > 0.0)
+    lane_width = widths[len(widths) // 2] if widths else float(default_lane_width)
+    return 0.5 * lane_width
+
+
 def build_decision_maker(scenario: Scenario, decision: str) -> BaseDecisionMaker:
     vp = _vehicle_params(scenario)
     ego_length = float(vp.get("length", 4.8))
@@ -147,6 +155,7 @@ def build_planner(scenario: Scenario, planner: Optional[str] = None) -> BasePlan
             ego_width=float(vp.get("width", 1.9)),
             max_accel=float(vp.get("max_accel", 3.5)),
             max_decel=float(vp.get("max_decel", 7.0)),
+            lane_half_width=_lane_half_width(scenario),
         )
 
     if name == "centerline":
@@ -219,9 +228,11 @@ def build_engine(
     return SimulationEngine(
         road_network=scenario.road_network,
         obstacle_manager=scenario.obstacle_manager,
-        decision_maker=build_decision_maker(scenario, decision),
-        planner=build_planner(scenario, planner),
-        controller=build_controller(scenario, controller),
+        # 必须使用上面的 resolved_* （已处理 None 与场景默认值），否则
+        # build_engine(decision=None) 会走到 "Unknown decision type" 分支。
+        decision_maker=build_decision_maker(scenario, resolved_decision),
+        planner=build_planner(scenario, resolved_planner),
+        controller=build_controller(scenario, resolved_controller),
         ego_initial_state=scenario.ego_state,
         use_dynamic_model=use_dynamic_model,
         enable_visualization=enable_visualization,

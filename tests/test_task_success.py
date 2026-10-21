@@ -65,9 +65,53 @@ class TestTaskLevelSuccess(unittest.TestCase):
         self.assertLessEqual(engine.ego_state.velocity, 0.5)
         self.assertGreaterEqual(report["min_obstacle_distance_m"], 2.0)
 
+    def test_completed_task_reports_real_completion_time(self):
+        """``task_completed == 1`` 时不得再写出 999 哨兵完成时间。
+
+        早期实现只给 highway_merge / 交叉口写 ``task_completion_time``，
+        cut_in 与 emergency_avoidance 的完成时刻永远为 None，最终被序列化成
+        999，导致同一行数据自相矛盾。
+        """
+        cases = (("cut_in", 12.0), ("emergency_avoidance", 22.0))
+        for name, duration in cases:
+            with self.subTest(scenario=name):
+                scenario = load_named_scenario(name)
+                engine = build_engine(
+                    scenario, decision="fsm", seed=42, enable_visualization=False
+                )
+                report = engine.run(duration)
+                self.assertEqual(report["task_completed"], 1.0)
+                self.assertEqual(report["success_rate"], 1.0)
+                self.assertLess(report["task_completion_time_s"], duration)
+                self.assertGreater(report["task_completion_time_s"], 0.0)
+
+    def test_uncompleted_task_keeps_sentinel_completion_time(self):
+        """未完成时仍用 999 表示"无完成时刻"，与 completed=0 保持一致。"""
+        scenario = load_named_scenario("highway_merge")
+        engine = build_engine(scenario, decision="game", seed=42, enable_visualization=False)
+        report = engine.run(10.0)
+        self.assertEqual(report["task_completed"], 0.0)
+        self.assertEqual(report["task_completion_time_s"], 999.0)
+
+
+class TestRunnerResolvedDefaults(unittest.TestCase):
+    """``build_engine`` 必须使用解析后的算法名，而不是原始参数。"""
+
+    def test_none_decision_falls_back_to_fsm(self):
+        scenario = load_named_scenario("highway_merge")
+        engine = build_engine(scenario, decision=None, enable_visualization=False)
+        self.assertEqual(type(engine.decision_maker).__name__, "HierarchicalFSMDecisionMaker")
+
+    def test_none_planner_and_controller_use_scenario_defaults(self):
+        scenario = load_named_scenario("cut_in")
+        engine = build_engine(
+            scenario, decision="fsm", planner=None, controller=None, enable_visualization=False
+        )
+        self.assertEqual(type(engine.planner).__name__, "FrenetLatticePlanner")
+        self.assertEqual(type(engine.controller).__name__, "LQRController")
+
 
 class TestPlannerSafetyFallback(unittest.TestCase):
-
     def test_invalid_trajectory_triggers_braking_fallback(self):
         scenario = load_named_scenario("highway_merge")
         engine = build_engine(scenario, decision="fsm", seed=42, enable_visualization=False)

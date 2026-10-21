@@ -37,7 +37,9 @@ jobs:
         run: |
           python -B -m unittest discover tests -v
 
-      - name: Run core smoke benchmark (5 s)
+      - name: Run core smoke benchmark (6 s)
+        # 6 s 而非 5 s：cut_in 的任务判据要求观察窗 >= 5.0 s，5 s 跑到 t=4.95
+        # 必然报 success=0，容易被误读为回归。
         env:
           OMP_NUM_THREADS: "1"
           OPENBLAS_NUM_THREADS: "1"
@@ -46,7 +48,7 @@ jobs:
         run: |
           python -B scripts/run_benchmark.py \
             --scenarios highway_merge cut_in emergency_avoidance \
-            --decisions fsm --seeds 42 --duration 5.0 \
+            --decisions fsm --seeds 42 --duration 6.0 \
             --output-dir /tmp/siac_ci
 
       - name: Check benchmark provenance

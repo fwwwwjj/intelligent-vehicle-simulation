@@ -87,7 +87,11 @@ class PerformanceEvaluator:
         lat_errors = [abs(r.lateral_error) for r in self.records]
         heading_errors = [abs(r.heading_error) for r in self.records]
         dists = [r.min_obstacle_distance for r in self.records]
-        ttcs = [r.min_ttc for r in self.records if 0.0 < r.min_ttc < 50.0]
+        # TTC = 0 表示本帧已贴靠/追尾，是**合法的危险值**，必须保留；
+        # 早期实现用 ``0.0 < ttc`` 把它过滤掉，导致"发生碰撞的运行反而报出
+        # 一个更大的最小 TTC"，与 min_obstacle_distance=0 自相矛盾。
+        # 50 s 以上视为"前方无约束目标"的哨兵值，剔除以免污染最小值。
+        ttcs = [r.min_ttc for r in self.records if r.min_ttc < 50.0]
         latencies = [r.planning_latency_ms for r in self.records]
         decision_latencies = [r.decision_latency_ms for r in self.records]
         control_latencies = [r.control_latency_ms for r in self.records]
@@ -121,6 +125,9 @@ class PerformanceEvaluator:
             "rms_jerk_m_s3": float(np.sqrt(np.mean(np.square(jerks)))),
             "max_accel_m_s2": float(np.max(accels)),
             "max_decel_m_s2": float(np.min(accels)),  # 最小纵向加速度（负值表示制动；未制动时可能为正）
+            # 说明：``min_accel_m_s2`` 与 ``max_decel_m_s2`` 在数值上等价（同一
+            # ``np.min``）。保留该键仅为兼容历史 CSV/JSON 的列名，新增代码请统一
+            # 使用 ``max_decel_m_s2``。
             "min_accel_m_s2": float(np.min(accels)),
             "max_lateral_accel_m_s2": float(np.max(lateral_accels)),
             "mean_lateral_error_m": float(np.mean(lat_errors)),

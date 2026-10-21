@@ -74,6 +74,8 @@ class FrenetLatticePlanner(BasePlanner):
         ego_width: float = 1.9,
         max_accel: float = 3.5,
         max_decel: float = 7.0,
+        lane_half_width: float = 1.875,
+        shoulder_margin: float = 0.30,
     ):
         self.cost_evaluator = cost_evaluator or TrajectoryCostEvaluator(
             ego_length=ego_length,
@@ -85,6 +87,10 @@ class FrenetLatticePlanner(BasePlanner):
         self.ego_width = ego_width
         self.max_accel = max_accel
         self.max_decel = max_decel
+        # 真实车道半宽（3.75 m 车道 → 1.875 m）。横向候选必须限制在
+        # "半宽 + 路肩"以内，否则规划器会主动生成一条已被判定为"驶出道路"的轨迹。
+        self.lane_half_width = float(lane_half_width)
+        self.shoulder_margin = float(shoulder_margin)
         self.max_curvature = float(np.tan(0.65) / 2.85)
 
     # ------------------------------------------------------------------
@@ -270,9 +276,10 @@ class FrenetLatticePlanner(BasePlanner):
         ]
 
         candidates: List[Trajectory] = []
-        # Keep the total lattice within nine trajectories, even with three time
-        # horizons. Prefer obstacle-side alternatives over redundant centering.
-        max_targets = max(1, 9 // len(horizons))
+        # 当前实现只启用单一规划时域；保留 horizons 列表是为了将来扩展多时域时
+        # 候选总数仍受上限约束（横向目标数 × 时域数 ≤ MAX_LATTICE_SIZE）。
+        MAX_LATTICE_SIZE = 9
+        max_targets = max(1, MAX_LATTICE_SIZE // len(horizons))
         if len(lateral_targets) > max_targets:
             lateral_targets = sorted(lateral_targets, key=lambda value: (abs(value - base_l), value))[:max_targets]
         if nearby_obstacle and len(lateral_targets) > 3:
@@ -332,10 +339,9 @@ class FrenetLatticePlanner(BasePlanner):
         base_l: float,
     ) -> List[float]:
         """Generate a compact set of targets from nearby Frenet free corridors."""
-        # The lateral reference may already be lane center or an adjacent lane
-        # target. Use the standard road lane extent plus a safety shoulder so a
-        # vehicle can perform an in-lane nudge around a narrow stationary object.
-        lane_half_width = 3.0
+        # 横向参考可能已是车道中心或相邻车道目标。以真实车道半宽 + 路肩为边界，
+        # 既能绕行窄障碍物，又不会把候选目标放到道路之外。
+        lane_half_width = self.lane_half_width + self.shoulder_margin
         left_limit, right_limit = base_l + lane_half_width, base_l - lane_half_width
         left_clearance, right_clearance = lane_half_width, lane_half_width
         for obs in obstacles:
@@ -359,8 +365,12 @@ class FrenetLatticePlanner(BasePlanner):
                 right_clearance = min(right_clearance, obs_l_min - right_limit)
 
         targets = [base_l]
-        if left_clearance > 2.2:
+        # 只有"该侧剩余走廊明显宽于车身"时才生成绕行候选；阈值与车宽挂钩，
+        # 不能写成针对某一特定车道宽的固定值（例如 2.2 m），否则换车道宽度后
+        # 绕行候选会整体消失或整体越界。
+        min_corridor = 0.5 * self.ego_width + 0.30
+        if left_clearance > min_corridor:
             targets.extend((base_l + 0.8, base_l + 1.2, base_l + 1.6))
-        if right_clearance > 2.2:
+        if right_clearance > min_corridor:
             targets.extend((base_l - 0.8, base_l - 1.2, base_l - 1.6))
         return sorted(set(float(np.clip(v, right_limit + 0.1, left_limit - 0.1)) for v in targets))[:7]

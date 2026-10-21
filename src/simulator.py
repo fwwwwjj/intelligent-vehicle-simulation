@@ -378,10 +378,18 @@ class SimulationEngine:
             completed = no_collision
             success = no_collision
 
+        # cut_in / emergency_avoidance 没有"到达目标点"这种离散事件，完成时刻
+        # 只能由任务判据首次成立的那一刻决定。这里统一补写，否则会出现
+        # completed=1 却 completion_time 为 None（最终被写成 999 哨兵）的矛盾。
+        if completed and self.task_completion_time is None:
+            self.task_completion_time = float(self.current_time)
+
         self.evaluator.set_task_result(
             success=success,
             completed=completed,
-            completion_time=self.task_completion_time,
+            # 判据可能在本帧回退为 False（例如净距再次低于阈值），此时不应
+            # 再报告一个历史完成时刻。
+            completion_time=self.task_completion_time if completed else None,
             road_departure=self.road_departure,
         )
 

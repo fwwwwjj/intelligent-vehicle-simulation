@@ -140,10 +140,14 @@ class LQRController(BaseController):
         q_matrix: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         q_eff = self.Q if q_matrix is None else q_matrix
+        # 用矩阵原始字节做缓存键：早期版本用 round(norm(A), 6) 之类的范数，
+        # 不同 (A, B) 可能出现相同范数而取到错误增益（静默失效）。
         key = (
-            round(float(np.linalg.norm(a_d)), 6),
-            round(float(np.linalg.norm(b_d)), 6),
-            round(float(np.linalg.norm(q_eff)), 6),
+            a_d.shape,
+            b_d.shape,
+            a_d.tobytes(),
+            b_d.tobytes(),
+            q_eff.tobytes(),
         )
         cached = self._dare_cache.get(key)
         if cached is not None:
