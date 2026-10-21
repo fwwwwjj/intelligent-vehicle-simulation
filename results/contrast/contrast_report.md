@@ -82,9 +82,9 @@ Values are mean ± sample standard deviation (ddof=1). `min_ttc_s` uses only fin
 
 | Condition | Scenario | min distance (m) | min TTC (s) | RMS jerk (m/s^3) | max lat accel (m/s^2) | max lat error (m) |
 | --- | --- | --- | --- | --- | --- | --- |
-| ablation_controller_mpc | cut_in | 0.023 ± 0.061 | 0.877 ± 0.726 | 0.868 ± 0.020 | 4.003 ± 0.000 | 0.067 ± 0.000 |
-| ablation_controller_mpc | emergency_avoidance | 0.000 ± 0.000 | 0.029 ± 0.003 | 8.794 ± 0.412 | 0.000 ± 0.000 | 0.000 ± 0.000 |
-| ablation_controller_mpc | highway_merge | 1.804 ± 0.011 | — | 0.208 ± 0.003 | 3.845 ± 0.508 | 0.063 ± 0.005 |
+| ablation_controller_mpc | cut_in | 0.023 ± 0.061 | 0.232 ± 0.496 | 0.868 ± 0.020 | 4.003 ± 0.000 | 0.067 ± 0.000 |
+| ablation_controller_mpc | emergency_avoidance | 0.000 ± 0.000 | 0.000 ± 0.000 | 8.794 ± 0.412 | 0.000 ± 0.000 | 0.000 ± 0.000 |
+| ablation_controller_mpc | highway_merge | 1.807 ± 0.013 | — | 0.207 ± 0.003 | 3.733 ± 0.634 | 0.063 ± 0.005 |
 | ablation_controller_pure_pursuit | cut_in | 5.030 ± 0.154 | 1.742 ± 0.040 | 2.406 ± 0.049 | 2.852 ± 0.148 | 0.062 ± 0.004 |
 | ablation_controller_pure_pursuit | emergency_avoidance | 15.522 ± 0.099 | 2.371 ± 0.000 | 2.075 ± 0.036 | 0.000 ± 0.000 | 0.000 ± 0.000 |
 | ablation_controller_pure_pursuit | highway_merge | 1.850 ± 0.000 | 20.230 ± 0.171 | 2.722 ± 0.045 | 3.001 ± 0.000 | 0.060 ± 0.000 |
@@ -119,9 +119,9 @@ Values are mean ± sample standard deviation (ddof=1). `min_ttc_s` uses only fin
 
 | Condition | Scenario | avg plan latency (ms) | p95 plan latency (ms) | completion time (s) | collision frames | planner fallback rate | controller fallback rate |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ablation_controller_mpc | cut_in | 3.024 ± 0.031 | 5.325 ± 0.107 | — | 74.433 ± 63.279 | 0.000 ± 0.000 | 0.003 ± 0.001 |
-| ablation_controller_mpc | emergency_avoidance | 2.285 ± 0.017 | 2.668 ± 0.040 | — | 285.000 ± 0.000 | 0.000 ± 0.000 | 0.000 ± 0.000 |
-| ablation_controller_mpc | highway_merge | 4.674 ± 0.057 | 5.656 ± 0.167 | — | 0.000 ± 0.000 | 0.000 ± 0.000 | 0.003 ± 0.002 |
+| ablation_controller_mpc | cut_in | 1.912 ± 0.015 | 3.236 ± 0.064 | — | 74.433 ± 63.279 | 0.000 ± 0.000 | 0.003 ± 0.001 |
+| ablation_controller_mpc | emergency_avoidance | 1.426 ± 0.010 | 1.644 ± 0.019 | — | 285.000 ± 0.000 | 0.000 ± 0.000 | 0.000 ± 0.000 |
+| ablation_controller_mpc | highway_merge | 2.791 ± 0.038 | 3.448 ± 0.090 | — | 0.000 ± 0.000 | 0.000 ± 0.000 | 0.002 ± 0.002 |
 | ablation_controller_pure_pursuit | cut_in | 2.184 ± 0.020 | 5.387 ± 0.085 | — | 0.000 ± 0.000 | 0.000 ± 0.000 | 0.000 ± 0.000 |
 | ablation_controller_pure_pursuit | emergency_avoidance | 1.713 ± 0.015 | 1.989 ± 0.037 | — | 0.000 ± 0.000 | 0.000 ± 0.000 | 0.000 ± 0.000 |
 | ablation_controller_pure_pursuit | highway_merge | 2.391 ± 0.013 | 3.123 ± 0.032 | 11.868 ± 0.036 | 0.000 ± 0.000 | 0.000 ± 0.000 | 0.000 ± 0.000 |
@@ -174,16 +174,16 @@ Pairs are matched on `(scenario, seed)`; the difference is always `condition - p
 
 | Condition | Metric | pairs | proposed mean | condition mean | mean diff | 95% CI | Wilcoxon p | p (Holm) | Cliff's delta | effect | significant |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ablation_controller_mpc | min obstacle distance (m) | 90 | 7.137 | 0.609 | -6.528 | [-7.702, -5.301] | 0.0000 | 0.0000 | -0.995 | large | yes |
-| ablation_controller_mpc | min TTC (s) | 60 | 2.059 | 0.453 | -1.606 | [-1.826, -1.370] | 0.0000 | 0.0000 | -0.939 | large | yes |
-| ablation_controller_mpc | RMS jerk (m/s^3) | 90 | 1.880 | 3.290 | +1.410 | [+0.591, +2.244] | 0.3815 | 0.7630 | -0.333 | medium | no |
-| ablation_controller_mpc | max lateral accel (m/s^2) | 90 | 1.670 | 2.616 | +0.946 | [+0.793, +1.096] | 0.0000 | 0.0000 | +0.511 | large | yes |
-| ablation_controller_mpc | max lateral error (m) | 90 | 0.045 | 0.043 | -0.001 | [-0.002, -0.000] | 0.0011 | 0.0032 | -0.029 | negligible | yes |
-| ablation_controller_mpc | avg planning latency (ms) | 90 | 2.086 | 3.328 | +1.242 | [+1.091, +1.401] | 0.0000 | 0.0000 | +0.778 | large | yes |
-| ablation_controller_mpc | p95 planning latency (ms) | 90 | 3.454 | 4.549 | +1.095 | [+0.877, +1.316] | 0.0000 | 0.0000 | +0.423 | medium | yes |
+| ablation_controller_mpc | min obstacle distance (m) | 90 | 7.137 | 0.610 | -6.527 | [-7.701, -5.300] | 0.0000 | 0.0000 | -0.991 | large | yes |
+| ablation_controller_mpc | min TTC (s) | 60 | 2.059 | 0.116 | -1.943 | [-2.069, -1.800] | 0.0000 | 0.0000 | -0.983 | large | yes |
+| ablation_controller_mpc | RMS jerk (m/s^3) | 90 | 1.880 | 3.290 | +1.410 | [+0.590, +2.244] | 0.3815 | 1.0000 | -0.333 | medium | no |
+| ablation_controller_mpc | max lateral accel (m/s^2) | 90 | 1.670 | 2.579 | +0.908 | [+0.748, +1.063] | 0.0000 | 0.0000 | +0.481 | large | yes |
+| ablation_controller_mpc | max lateral error (m) | 90 | 0.045 | 0.043 | -0.001 | [-0.002, -0.000] | 0.0004 | 0.0014 | -0.037 | negligible | yes |
+| ablation_controller_mpc | avg planning latency (ms) | 90 | 2.086 | 2.043 | -0.043 | [-0.107, +0.025] | 0.3837 | 1.0000 | -0.111 | negligible | no |
+| ablation_controller_mpc | p95 planning latency (ms) | 90 | 3.454 | 2.776 | -0.679 | [-0.888, -0.468] | 0.0002 | 0.0010 | -0.114 | negligible | yes |
 | ablation_controller_mpc | collision frames | 90 | 0.000 | 119.811 | +119.811 | [+93.559, +146.014] | 0.0000 | 0.0000 | +0.589 | large | yes |
 | ablation_controller_mpc | planner fallback rate | 90 | 0.000 | 0.000 | +0.000 | [+0.000, +0.000] | 1.0000 | 1.0000 | +0.000 | negligible | no |
-| ablation_controller_mpc | controller fallback rate | 90 | 0.000 | 0.002 | +0.002 | [+0.001, +0.002] | 0.0000 | 0.0000 | +0.556 | large | yes |
+| ablation_controller_mpc | controller fallback rate | 90 | 0.000 | 0.002 | +0.002 | [+0.001, +0.002] | 0.0000 | 0.0000 | +0.511 | large | yes |
 | ablation_controller_pure_pursuit | min obstacle distance (m) | 90 | 7.137 | 7.467 | +0.330 | [+0.169, +0.499] | 0.0068 | 0.0341 | +0.091 | negligible | yes |
 | ablation_controller_pure_pursuit | min TTC (s) | 90 | 8.176 | 8.114 | -0.062 | [-0.088, -0.039] | 0.0000 | 0.0000 | -0.122 | negligible | yes |
 | ablation_controller_pure_pursuit | RMS jerk (m/s^3) | 90 | 1.880 | 2.401 | +0.522 | [+0.483, +0.560] | 0.0000 | 0.0000 | +0.993 | large | yes |
@@ -283,7 +283,7 @@ Pairs are matched on `(scenario, seed)`; the difference is always `condition - p
 
 ## Interpretation Notes
 
-- **ablation_controller_mpc (experimental condition)**: success rate is significantly lower than proposed (risk diff -1.000) — degradation. Holm-significant metric changes: min obstacle distance (m) worsened (mean diff -6.528, Holm p=0.0000, Cliff's delta=-0.995); min TTC (s) worsened (mean diff -1.606, Holm p=0.0000, Cliff's delta=-0.939); max lateral accel (m/s^2) worsened (mean diff +0.946, Holm p=0.0000, Cliff's delta=+0.511); max lateral error (m) improved (mean diff -0.001, Holm p=0.0032, Cliff's delta=-0.029); avg planning latency (ms) worsened (mean diff +1.242, Holm p=0.0000, Cliff's delta=+0.778); p95 planning latency (ms) worsened (mean diff +1.095, Holm p=0.0000, Cliff's delta=+0.423); collision frames worsened (mean diff +119.811, Holm p=0.0000, Cliff's delta=+0.589); controller fallback rate worsened (mean diff +0.002, Holm p=0.0000, Cliff's delta=+0.556).
+- **ablation_controller_mpc (experimental condition)**: success rate is significantly lower than proposed (risk diff -1.000) — degradation. Holm-significant metric changes: min obstacle distance (m) worsened (mean diff -6.527, Holm p=0.0000, Cliff's delta=-0.991); min TTC (s) worsened (mean diff -1.943, Holm p=0.0000, Cliff's delta=-0.983); max lateral accel (m/s^2) worsened (mean diff +0.908, Holm p=0.0000, Cliff's delta=+0.481); max lateral error (m) improved (mean diff -0.001, Holm p=0.0014, Cliff's delta=-0.037); p95 planning latency (ms) improved (mean diff -0.679, Holm p=0.0010, Cliff's delta=-0.114); collision frames worsened (mean diff +119.811, Holm p=0.0000, Cliff's delta=+0.589); controller fallback rate worsened (mean diff +0.002, Holm p=0.0000, Cliff's delta=+0.511).
 - **ablation_controller_pure_pursuit**: success rate difference (risk diff +0.000) is not significant after Holm correction. Holm-significant metric changes: min obstacle distance (m) improved (mean diff +0.330, Holm p=0.0341, Cliff's delta=+0.091); min TTC (s) worsened (mean diff -0.062, Holm p=0.0000, Cliff's delta=-0.122); RMS jerk (m/s^3) worsened (mean diff +0.522, Holm p=0.0000, Cliff's delta=+0.993); max lateral accel (m/s^2) worsened (mean diff +0.281, Holm p=0.0000, Cliff's delta=+0.541); max lateral error (m) improved (mean diff -0.004, Holm p=0.0000, Cliff's delta=-0.100); avg planning latency (ms) worsened (mean diff +0.010, Holm p=0.0034, Cliff's delta=+0.096); p95 planning latency (ms) worsened (mean diff +0.045, Holm p=0.0000, Cliff's delta=+0.168); completion time (s) worsened (mean diff +0.152, Holm p=0.0000, Cliff's delta=+0.991).
 - **ablation_decision_game (experimental condition)**: success rate is significantly lower than proposed (risk diff -0.333) — degradation. Holm-significant metric changes: min obstacle distance (m) worsened (mean diff -0.212, Holm p=0.0389, Cliff's delta=-0.082); RMS jerk (m/s^3) improved (mean diff -0.599, Holm p=0.0000, Cliff's delta=-1.000); max lateral accel (m/s^2) worsened (mean diff +0.001, Holm p=0.0000, Cliff's delta=+0.111); max lateral error (m) worsened (mean diff +0.005, Holm p=0.0000, Cliff's delta=+0.237); avg planning latency (ms) worsened (mean diff +1.013, Holm p=0.0000, Cliff's delta=+0.302); p95 planning latency (ms) worsened (mean diff +1.514, Holm p=0.0000, Cliff's delta=+0.506).
 - **ablation_decision_idm**: success rate is significantly lower than proposed (risk diff -0.333) — degradation. Holm-significant metric changes: min TTC (s) worsened (mean diff -0.052, Holm p=0.0000, Cliff's delta=-0.344); max lateral accel (m/s^2) improved (mean diff -0.834, Holm p=0.0000, Cliff's delta=-0.222); max lateral error (m) improved (mean diff -0.020, Holm p=0.0000, Cliff's delta=-0.222).

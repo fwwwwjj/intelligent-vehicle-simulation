@@ -6,7 +6,7 @@
 [![Competition: SIAC](https://img.shields.io/badge/Competition-中国仿真创新应用大赛-red.svg)](http://www.siac.net.cn/)
 [![CI](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/fwwwwjj/intelligent-vehicle-simulation/actions/workflows/ci.yml)
 
-> 本地测试：148 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
+> 本地测试：157 项通过（`python -m unittest discover tests`）；CI 是否通过以 GitHub Actions 徽标/页面为准，不使用静态“tests passing”徽标。
 >
 > 本项目为**中国仿真创新应用大赛**参赛项目。当前版本（v0.4-core）聚焦一条**可运行、可验证、可复现**的闭环主链：
 >
@@ -44,7 +44,7 @@
 | **2. 数字模型或系统** | [docs/02_digital_models.md](docs/02_digital_models.md) | `src/vehicle_model/`（运动学）、`src/decision/`（FSM）、`src/planning/`（Lattice）、`src/control/`（LQR/PID） |
 | **3. 结果演示分析或说明** | [docs/03_results_and_demo.md](docs/03_results_and_demo.md) | `src/evaluation/metrics.py`、`src/visualization/`、`results/`（JSON/CSV/KPI） |
 | **4. 应用说明与工程落地** | [docs/04_application.md](docs/04_application.md) | `src/simulator.py`（MIL/SIL 闭环、教学实验） |
-| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、148 项本地测试、标准与文献列表 |
+| **5. 代码体系与参考文献** | [docs/05_references.md](docs/05_references.md) | Python 代码库、157 项本地测试、标准与文献列表 |
 
 > 复杂算法（Game/EM/MPC/Pacejka/交叉口）的说明保留在 [docs/06_qp_mpc_em_pacejka.md](docs/06_qp_mpc_em_pacejka.md)，并在 [docs/07_scope_and_future_work.md](docs/07_scope_and_future_work.md) 中明确标为未来工作。
 
@@ -105,7 +105,7 @@ intelligent-vehicle-simulation/
 │   ├── runner.py               # 场景 → 算法装配工厂
 │   └── simulator.py            # 闭环仿真主引擎
 ├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
-├── tests/                      # 148 项单元/闭环测试
+├── tests/                      # 157 项单元/闭环测试
 └── results/                    # 30-seed 核心基准 JSON/CSV、归档
 ```
 
@@ -183,7 +183,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREAD
   nice -n 19 python3 -B -m unittest discover tests -v
 ```
 
-当前 **148 项测试**，约 10–20 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
+当前 **157 项测试**，约 15–25 s（含任务级闭环用例，视机器负载）。测试覆盖坐标变换、OBB、运动学/动力学、QP、LQR/PID、MPC、Lattice、EM、Pacejka、指标、highD 解析、标定、闭环速度跟踪、seed 复现、任务成功判据。
 
 ### 4. 运行核心基准（低功耗，30 seeds）
 
@@ -240,9 +240,9 @@ python3 scripts/replay_highd.py --data-root data/raw/highD --recording 01 \
 
 | 场景 | 任务成功率 (95% CI) | 最小净距 (m) | 最小 TTC (s) | RMS Jerk (m/s³) | 最大横向误差 (m) | 规划均值 / p95 (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `highway_merge` | 1.000 [0.886, 1.000] | 1.84 ± 0.01 | 20.41 ± 0.12 | 2.003 ± 0.021 | 0.060 ± 0.000 | 2.29 / 3.15 |
-| `cut_in` | 1.000 [0.886, 1.000] | 5.47 ± 0.16 | 1.75 ± 0.04 | 1.833 ± 0.038 | 0.074 ± 0.003 | 1.99 / 5.06 |
-| `emergency_avoidance` | 1.000 [0.886, 1.000] | 14.11 ± 0.13 | 2.37 ± 0.00 | 1.803 ± 0.002 | 0.000 ± 0.000 | 1.56 / 1.89 |
+| `highway_merge` | 1.000 [0.886, 1.000] | 1.84 ± 0.01 | 20.41 ± 0.12 | 2.003 ± 0.021 | 0.060 ± 0.000 | 1.50 / 1.99 |
+| `cut_in` | 1.000 [0.886, 1.000] | 5.47 ± 0.16 | 1.75 ± 0.04 | 1.833 ± 0.038 | 0.074 ± 0.003 | 1.30 / 3.30 |
+| `emergency_avoidance` | 1.000 [0.886, 1.000] | 14.11 ± 0.13 | 2.37 ± 0.00 | 1.803 ± 0.002 | 0.000 ± 0.000 | 1.01 / 1.14 |
 
 > 任务成功率 = 完成任务 + 无碰撞 + 不驶出道路，不是“未碰撞”。详细定义、逐 seed 结果与复现命令见 [docs/03_results_and_demo.md](docs/03_results_and_demo.md) 和 `results/`。
 >

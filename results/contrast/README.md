@@ -39,9 +39,28 @@
 | `execution.log` / `tests_before.log` / `tests_after.log` | 完整正式实验进度/耗时及前后148项测试日志 |
 | `run_lowpower_windows.py` | 本次实际使用的外部启动器副本，只设置线程与进程优先级，不改算法 |
 
-`contrast.json`原始运行及元数据保持不变；分析不重新仿真。TTC汇总过滤999及≥50 s；
+`contrast.json`原始运行及元数据保持不变；分析不重新仿真（唯一例外见下节"局部刷新"）。
+TTC汇总只剔除 **≥50 s 与 999 哨兵**，**TTC=0 属于碰撞帧的合法危险值，予以保留**
+（2026-10-21 之前的旧口径用 `0 < ttc` 过滤，会把碰撞运行的 min TTC 抬高，已修正）。
 完成时间过滤999。控制/规划时延分开记录；表中的p95均值不是全部帧合并后的p95。
 统计差值方向均为条件−proposed。Holm仅限每个条件内的既定指标组，不是整个研究全局校正。
+
+## 2026-10-21 局部刷新（仅 `ablation_controller_mpc` 条件）
+
+修复 `src/evaluation/metrics.py` 的 TTC 口径后，只有**发生碰撞的运行**数值会变；
+990 次中仅 `ablation_controller_mpc` 含碰撞（53/90），因此只重跑该条件 90 次，
+其余 10 个条件（含 proposed 与全部基线）**没有重跑、原始行未改动**。
+
+- 修正内容：`min_ttc_s` 最小值不再丢弃 `TTC=0`。该条件 `cut_in` 的 23 次碰撞运行
+  与 `emergency_avoidance` 的 30 次碰撞运行，`min_ttc` 由 0.877 / 0.029 变为 **0.000**，
+  与 `min_obstacle_distance_m=0.023 / 0.000` 一致。
+- `contrast.json.metadata.partial_refresh` 记录被刷新的条件、次数、时间、commit 与原因；
+  `summary`、`comparisons`、`contrast_runs.csv`、`contrast_tables.md`、`contrast_findings.md`
+  均由合并后的 990 行原始数据重算，未手工改数。
+- ⚠️ `validation.json` 是**历史凭证**（源提交 `e0d7643` 时对原主结果做的字节/组合校验）。
+  原主结果已在 2026-10-21 按新 TTC 口径与完成时刻口径重跑，因此该文件中的
+  `main_result_raw_sha256_verified` 与当前 `results/benchmark.*` **按设计不再匹配**；
+  它证明的是"那次 990 次实验没有改动当时的主结果"，不是"与当前主结果一致"。
 
 ## 只重建报告、图及文档表（无需仿真）
 

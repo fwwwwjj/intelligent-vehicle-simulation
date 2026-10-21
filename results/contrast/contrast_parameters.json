@@ -1,7 +1,7 @@
 {
   "simulation_source_commit": "e0d7643a0941a651fb2ec8ffa712c77f0f3d26ff",
   "note": "Read after simulation; source/config identity checked against the recorded baseline. No stepping.",
-  "default_config_sha256": "46d2768f2cd9ae06e346a7798582ffd3c41d6505600836b8c9782f703841e035",
+  "default_config_sha256": "46c3acf28d81c14f51a9c9c0ca34953b9c85a283524f1a484a0d30b9989662c4",
   "constructor_defaults": {
     "LQRController": {
       "q_matrix_diag": [

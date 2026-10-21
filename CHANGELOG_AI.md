@@ -1,5 +1,38 @@
 # AI 修改记录
 
+## 2026-10-21 (指标口径与车道边界修复；主结果按新口径重跑)
+
+- **修复**：
+  1. `metrics.py` 的 `min_ttc_s` 不再用 `0.0 < ttc` 过滤——碰撞帧的 `TTC=0` 是合法危险值，
+     旧口径会把它丢掉，导致"发生碰撞的运行反而报出更大的最小 TTC"（实测 MPC/cut_in
+     碰撞 32 帧、净距 0.000 m，却报 `min_ttc=0.081`）。
+  2. `simulator.py` 的 `task_completion_time` 在任务判据**首次成立**时统一写入，
+     消除 `task_completed=1` 却 `task_completion_time_s=999` 的自相矛盾
+     （cut_in / emergency_avoidance 旧值均为 999）。
+  3. `obstacle_manager.py` 的 MOBIL 改用**真实车道中心**（`lane_centers`），
+     不再用 `y ± lane_width` 推算；2 车道公路曾可把车换到 y=7.5（路外）。
+  4. `frenet_lattice.py` 横向候选边界改为真实车道半宽 + 路肩，绕行阈值与车宽挂钩，
+     去掉硬编码 `lane_half_width=3.0` 与 `clearance>2.2`。
+  5. `cost_evaluator.py` 轨迹首点（t=0）也参与碰撞/净距检查。
+  6. `lqr_controller.py` DARE 缓存键改为矩阵字节，避免按范数命中错误增益。
+  7. `runner.py` `build_engine` 使用解析后的 decision/planner/controller 名称
+     （原先 `decision=None` 会抛 `Unknown decision type`）。
+  8. `requirements.txt` 版本上限覆盖两套实际运行环境；新增 `pyproject.toml`；
+     CI smoke 改为 6 s（cut_in 判据需 ≥5 s 观察窗，5 s 跑必报 success=0）。
+- **修改文件**：src/{evaluation/metrics,simulator,environment/obstacle_manager,
+  environment/scenario_loader,planning/frenet_lattice,planning/cost_evaluator,
+  control/lqr_controller,runner}.py；tests/{test_metrics,test_obstacle_manager,
+  test_task_success}.py；requirements.txt、pyproject.toml、.github/workflows/ci.yml；
+  README、docs/03、docs/05、docs/08、AI_SYSTEM_SPEC、results/{README,benchmark.*,
+  competition_pack/kpi_table.md}、results/contrast/*（局部刷新）、docs/11。
+- **主结果重跑**：90 次（3 场景 × 30 seeds，20 s），约 2 min 53 s，单线程 + `nice`。
+  安全/舒适指标与旧表逐位一致（净距 1.84/5.47/14.11，TTC 20.41/1.75/2.37，
+  jerk 2.003/1.833/1.803）；仅完成时间由 999 变为 5.05/6.60，规划时延随本机负载更新。
+- **对比实验局部刷新**：仅 `ablation_controller_mpc` 含碰撞（53/90），重跑该条件 90 次，
+  其余 10 条件原样保留；`metadata.partial_refresh` 记录原因与 commit。
+  `validation.json` 为历史凭证，其原主结果哈希与重跑后的主结果按设计不再匹配。
+- **验证**：157 项测试通过（新增 TTC=0、完成时刻一致性、MOBIL 车道边界、解析默认值回归）。
+
 ## 2026-10-20 (独立30-seed基线与消融正式结果)
 
 - **源版本与范围**：冻结 `e0d7643a0941a651fb2ec8ffa712c77f0f3d26ff`，不重设计既有方案；

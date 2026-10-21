@@ -40,7 +40,7 @@ intelligent-vehicle-simulation/
 │   ├── runner.py               # 场景 -> 决策/规划/控制/引擎装配工厂
 │   └── simulator.py            # 端到端闭环仿真主引擎
 ├── scripts/                    # run_simulation / run_benchmark / batches / export_* / highD 标定回放
-└── tests/                      # 148 项单元/闭环测试（含任务成功判据）
+└── tests/                      # 157 项单元/闭环测试（含任务成功判据）
 ```
 
 ---
@@ -48,7 +48,7 @@ intelligent-vehicle-simulation/
 ### 1.1 回归测试与结果复现
 
 ```bash
-# 低功耗测试（当前 148 项；含任务级闭环用例；约 10–20 s，视机器负载）
+# 低功耗测试（当前 157 项；含任务级闭环用例；约 10–20 s，视机器负载）
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 \
   nice -n 19 python3 -B -m unittest discover tests -v
 
